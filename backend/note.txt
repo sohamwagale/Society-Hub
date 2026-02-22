@@ -1,0 +1,15 @@
+To deploy om aws lambda enable the current setting seen on Society Function
+  1.enable cors
+  2.enable headers (Authorization,etc)
+  3.set @app.route("") instead of @app.route("/") due to multiple redirects
+  4.To make the python libs in Linux binary to be installed in code format for layers in aws lambda
+    pip install `
+      --platform manylinux2014_x86_64 `
+      --implementation cp `
+      --python-version 3.11 `
+      --only-binary=:all: `
+      --target=python `
+      -r requirements.txt
+  5.Convert the above to zip file named layers.zip and upload as layer and connect the layer via ARN number
+  6.upload code
+  7.Create functional url
