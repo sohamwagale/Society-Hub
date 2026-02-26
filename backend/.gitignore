@@ -3,6 +3,11 @@
 # dependencies
 node_modules/
 
+firebase-service-account.json
+*service-account*.json
+google-services.json
+GoogleService-Info.plist
+
 .env
 
 # Expo

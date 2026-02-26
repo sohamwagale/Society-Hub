@@ -43,8 +43,8 @@ const tokenStorage = {
 // ── Base URL ──
 // Use your machine's local network IP so Expo Go on a physical device can connect.
 // Find your IP: run `ipconfig` (Windows) or `ifconfig` (Mac/Linux).
-const BASE_URL = 'https://vu4rynvvc2p2dlulccufo7vbti0vraom.lambda-url.ap-south-1.on.aws/api';
-// const BASE_URL = 'http://192.168.1.5:8000/api';
+// const BASE_URL = 'https://vu4rynvvc2p2dlulccufo7vbti0vraom.lambda-url.ap-south-1.on.aws/api';
+const BASE_URL = 'http://192.168.1.6:8000/api';
 // const BASE_URL = 'http://10.0.2.2:8000/api'; // Android emulator only
 // const BASE_URL = 'http://localhost:8000/api';  // iOS simulator / web only
 const api = axios.create({ baseURL: BASE_URL, timeout: 10000 });

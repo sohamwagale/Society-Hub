@@ -17,6 +17,9 @@
     },
     "android": {
       "package": "com.yourname.societyhub",
+      "permissions": [
+        "POST_NOTIFICATIONS"
+      ],
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

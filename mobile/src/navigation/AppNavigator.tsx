@@ -7,7 +7,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from 'react-native-paper';
 import { useAuthStore } from '../store';
 import * as Notifications from 'expo-notifications';
-import { registerForPushNotifications, setupNotificationChannel } from '../utils/pushNotifications';
+import { usePushNotifications } from '../utils/pushNotifications';
+import { authAPI } from '../services/api';
 
 // ── Auth Screens ──
 import LoginScreen from '../screens/Auth/LoginScreen';
@@ -257,61 +258,25 @@ const NOTIF_NAV_MAP: Record<string, { tab: string; screen: string; paramKey: str
 export default function AppNavigator() {
   const { user, isAuthenticated, isLoading, loadUser } = useAuthStore();
   const navigationRef = useNavigationContainerRef<any>();
-  const notificationResponseListener = useRef<ReturnType<typeof Notifications.addNotificationResponseReceivedListener> | undefined>(undefined);
+
+  const { expoPushToken, notificationResponse } = usePushNotifications();
 
   useEffect(() => {
     loadUser();
-    setupNotificationChannel();
   }, []);
 
-  // Register push token when user is authenticated
+  // Send the token to the backend when it arrives and user is authenticated
   useEffect(() => {
-    if (isAuthenticated && user?.is_fully_approved) {
-      registerForPushNotifications();
+    if (isAuthenticated && user?.is_fully_approved && expoPushToken) {
+      authAPI.registerPushToken(expoPushToken.data)
+        .then(() => console.log('Push token registered with backend'))
+        .catch((e) => console.warn('Failed to register push token with backend:', e));
     }
-  }, [isAuthenticated, user?.is_fully_approved]);
+  }, [isAuthenticated, user?.is_fully_approved, expoPushToken]);
 
-  // Handle notification taps
-  useEffect(() => {
-    notificationResponseListener.current =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data as {
-          type?: string;
-          reference_id?: string;
-        };
 
-        if (!data?.type || !navigationRef.isReady()) return;
 
-        const mapping = NOTIF_NAV_MAP[data.type];
-        if (mapping) {
-          // If no reference ID, navigate to the list screen (e.g. Announcements)
-          if (!data.reference_id) {
-            (navigationRef as any).navigate(mapping.tab, {
-              screen: mapping.screen,
-            });
-          } else {
-            (navigationRef as any).navigate(mapping.tab, {
-              screen: mapping.screen,
-              params: { [mapping.paramKey]: data.reference_id },
-            });
-          }
-        }
-      });
-
-    return () => {
-      if (notificationResponseListener.current) {
-        notificationResponseListener.current.remove();
-      }
-    };
-  }, []);
-
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#0F0F1A', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#7C4DFF" />
-      </View>
-    );
-  }
+  const [isNavigationReady, setIsNavigationReady] = React.useState(false);
 
   // 4-state navigation
   const getNavigationState = () => {
@@ -323,8 +288,62 @@ export default function AppNavigator() {
 
   const state = getNavigationState();
 
+  // Handle notification taps (cold-start or foreground) once navigation is ready
+  useEffect(() => {
+    console.log('[DEBUG-PUSH] Trying handle. Response:', !!notificationResponse, 'Ready:', isNavigationReady, 'State:', state);
+    if (notificationResponse && isNavigationReady && state === 'main') {
+      const resp = notificationResponse as any;
+      console.log('[DEBUG-PUSH] Notification tapped:', JSON.stringify(resp.notification.request.content.data));
+      handleNotificationTap(notificationResponse);
+    }
+  }, [notificationResponse, isNavigationReady, state]);
+
+  const handleNotificationTap = (response: Notifications.NotificationResponse) => {
+    const data = response.notification.request.content.data as {
+      type?: string;
+      reference_id?: string;
+    };
+
+    console.log('[DEBUG-PUSH] Extracted Data:', data);
+    if (!data?.type || !navigationRef.isReady()) {
+      console.log('[DEBUG-PUSH] Aborting: No type or nav not ready');
+      return;
+    }
+
+    const mapping = NOTIF_NAV_MAP[data.type];
+    console.log('[DEBUG-PUSH] Found Mapping:', mapping);
+
+    if (mapping) {
+      if (!data.reference_id) {
+        console.log(`[DEBUG-PUSH] Navigating to ${mapping.tab} -> ${mapping.screen} (No Params)`);
+        (navigationRef as any).navigate(mapping.tab, {
+          screen: mapping.screen,
+        });
+      } else {
+        console.log(`[DEBUG-PUSH] Navigating to ${mapping.tab} -> ${mapping.screen} with Param: { ${mapping.paramKey}: ${data.reference_id} }`);
+        (navigationRef as any).navigate(mapping.tab, {
+          screen: mapping.screen,
+          params: { [mapping.paramKey]: data.reference_id },
+        });
+      }
+    } else {
+      console.log('[DEBUG-PUSH] No mapping configured for type:', data.type);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0F0F1A', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#7C4DFF" />
+      </View>
+    );
+  }
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer
+      ref={navigationRef}
+      onReady={() => setIsNavigationReady(true)}
+    >
       {state === 'auth' && <AuthStack />}
       {state === 'onboarding' && <OnboardingStack />}
       {state === 'pending' && (

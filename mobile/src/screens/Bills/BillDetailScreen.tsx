@@ -73,12 +73,6 @@ export default function BillDetailScreen({ route, navigation }: any) {
         `&tn=${encodeURIComponent("Bill Payment")}` +
         `&tr=${txnRef}`;
 
-      // const upiUrl =
-      //   `upi://pay?pa=sunilwagale@oksbi` +
-      //   `&pn=Test` +
-      //   `&am=2` +
-      //   `&cu=INR`;
-      // const upiUrl = `upi://pay?pa=${upiInfo.value}&pn=Society&am=${bill.amount}&cu=INR&tn=Bill%20Payment`;
       const supported = await Linking.canOpenURL(upiUrl);
       if (supported) {
         await Linking.openURL(upiUrl);
