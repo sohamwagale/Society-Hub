@@ -41,6 +41,7 @@ async def create_announcement(
 
     ann = Announcement(
         id=str(uuid.uuid4()),
+        society_id=admin.society_id,
         title=title,
         body=body,
         priority=AnnouncementPriority(priority),
@@ -57,6 +58,7 @@ async def create_announcement(
         db, f"📢 {ann.title}",
         ann.body[:100] + ("..." if len(ann.body) > 100 else ""),
         NotificationType.GENERAL, ann.id,
+        society_id=admin.society_id,
     )
 
     out = AnnouncementOut.model_validate(ann)
@@ -65,9 +67,10 @@ async def create_announcement(
 
 
 @router.get("", response_model=list[AnnouncementOut])
-def list_announcements(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def list_announcements(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     anns = (
         db.query(Announcement)
+        .filter(Announcement.society_id == current_user.society_id)
         .order_by(Announcement.pinned.desc(), Announcement.created_at.desc())
         .all()
     )

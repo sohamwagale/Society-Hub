@@ -41,6 +41,7 @@ async def upload_document(
 
     doc = SocietyDocument(
         id=doc_id,
+        society_id=current_user.society_id,
         title=title,
         description=description,
         file_url=file_url,
@@ -61,13 +62,17 @@ def list_documents(
     current_user: User = Depends(get_current_user),
 ):
     is_admin = current_user.role == UserRole.ADMIN
-    query = db.query(SocietyDocument).order_by(SocietyDocument.created_at.desc())
+    base_query = (
+        db.query(SocietyDocument)
+        .filter(SocietyDocument.society_id == current_user.society_id)
+        .order_by(SocietyDocument.created_at.desc())
+    )
 
     if is_admin:
-        docs = query.all()
+        docs = base_query.all()
     else:
         # Residents see approved docs + their own pending uploads
-        docs = query.filter(
+        docs = base_query.filter(
             (SocietyDocument.is_approved == True)
             | (SocietyDocument.uploaded_by == current_user.id)
         ).all()

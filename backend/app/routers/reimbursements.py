@@ -29,6 +29,7 @@ def create_request(
 ):
     req = ReimbursementRequest(
         id=str(uuid.uuid4()),
+        society_id=current_user.society_id,
         user_id=current_user.id,
         title=data.title,
         description=data.description,
@@ -46,7 +47,12 @@ def create_request(
 @router.get("", response_model=list[ReimbursementOut])
 def list_requests(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.role.value == "admin":
-        items = db.query(ReimbursementRequest).order_by(ReimbursementRequest.created_at.desc()).all()
+        items = (
+            db.query(ReimbursementRequest)
+            .filter(ReimbursementRequest.society_id == current_user.society_id)
+            .order_by(ReimbursementRequest.created_at.desc())
+            .all()
+        )
     else:
         items = (
             db.query(ReimbursementRequest)

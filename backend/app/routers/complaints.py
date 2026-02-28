@@ -26,6 +26,7 @@ def create_complaint(
 ):
     complaint = Complaint(
         id=str(uuid.uuid4()),
+        society_id=current_user.society_id,
         user_id=current_user.id,
         category=ComplaintCategory(data.category),
         title=data.title,
@@ -50,6 +51,8 @@ def list_complaints(
     # Role-based filtering
     if current_user.role.value != "admin":
         query = query.filter(Complaint.user_id == current_user.id)
+    else:
+        query = query.filter(Complaint.society_id == current_user.society_id)
 
     # Status filter
     if status:

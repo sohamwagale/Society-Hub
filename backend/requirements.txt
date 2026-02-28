@@ -13,6 +13,6 @@ httpx
 psycopg2-binary
 python-dotenv
 supabase==2.6.0
-mangum
+razorpay
 
 exponent_server_sdk

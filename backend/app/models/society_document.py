@@ -9,6 +9,7 @@ class SocietyDocument(Base):
     __tablename__ = "society_documents"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    society_id = Column(String, ForeignKey("societies.id"), nullable=True, index=True)
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     file_url = Column(String(500), nullable=False)

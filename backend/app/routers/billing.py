@@ -17,9 +17,12 @@ router = APIRouter(prefix="/api/bills", tags=["Billing"])
 
 
 def _get_payment_status(bill: Bill, user: User, db: Session) -> str:
-    # Admin: compute aggregate status across all residents
+    # Admin: compute aggregate status across all residents of the same society
     if user.role == "admin":
-        all_residents = [u for u in db.query(User).filter(User.role == "resident").all() if u.is_fully_approved]
+        residents_query = db.query(User).filter(User.role == "resident")
+        if bill.society_id:
+            residents_query = residents_query.filter(User.society_id == bill.society_id)
+        all_residents = [u for u in residents_query.all() if u.is_fully_approved]
         payments = db.query(BillPayment).filter(BillPayment.bill_id == bill.id).all()
         paid_user_ids = {p.user_id for p in payments}
 
@@ -84,6 +87,41 @@ def _get_resident_bill_amount(bill: Bill, user: User, db: Session) -> float:
     return bill.amount
 
 
+def _is_all_residents_paid(bill: Bill, db: Session) -> bool:
+    """
+    Returns True ONLY when every non-excluded resident (unique per flat) in the
+    same society has paid.  Excluded residents (amount == 0) are skipped.
+    """
+    residents_query = db.query(User).filter(User.role == "resident")
+    if bill.society_id:
+        residents_query = residents_query.filter(User.society_id == bill.society_id)
+    all_residents = [u for u in residents_query.all() if u.is_fully_approved]
+    payments = db.query(BillPayment).filter(BillPayment.bill_id == bill.id).all()
+    paid_user_ids = {p.user_id for p in payments}
+
+    # Collect flat IDs that have made a payment
+    paid_flat_ids: set = set()
+    for u in db.query(User).filter(User.id.in_(paid_user_ids)).all():
+        if u.flat_id:
+            paid_flat_ids.add(u.flat_id)
+
+    seen_flats: set = set()
+    total_owing = 0
+    total_paid = 0
+    for u in all_residents:
+        flat_key = u.flat_id or u.id
+        if flat_key in seen_flats:
+            continue
+        seen_flats.add(flat_key)
+        if _get_resident_bill_amount(bill, u, db) == 0:
+            continue  # excluded from this bill
+        total_owing += 1
+        if (u.id in paid_user_ids) or (u.flat_id and u.flat_id in paid_flat_ids):
+            total_paid += 1
+
+    return total_owing > 0 and total_paid >= total_owing
+
+
 @router.post("", response_model=BillOut, status_code=201)
 def create_bill(
     data: BillCreate,
@@ -92,6 +130,7 @@ def create_bill(
 ):
     bill = Bill(
         id=str(uuid.uuid4()),
+        society_id=admin.society_id,
         title=data.title,
         description=data.description,
         bill_type=BillType(data.bill_type),
@@ -113,11 +152,12 @@ def create_bill(
             db.add(flat_amount)
         db.commit()
 
-    # Notify all residents
+    # Notify all residents of this society
     notify_all_residents(
         db, f"New Bill: {bill.title}",
         f"Amount: Rs.{bill.amount} | Due: {bill.due_date}",
         NotificationType.BILL, bill.id,
+        society_id=admin.society_id,
     )
 
     result = BillOut.model_validate(bill)
@@ -131,7 +171,7 @@ def list_bills(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = db.query(Bill)
+    query = db.query(Bill).filter(Bill.society_id == current_user.society_id)
     if bill_type:
         query = query.filter(Bill.bill_type == BillType(bill_type))
     if active_only is not None:
@@ -186,12 +226,25 @@ def export_bills_report(
     if not current_user or current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    # Get data
-    active_bills = db.query(Bill).filter(Bill.is_active == True).order_by(Bill.due_date.desc()).all()
+    # Get data (scoped to admin's society)
+    active_bills = (
+        db.query(Bill)
+        .filter(Bill.is_active == True, Bill.society_id == current_user.society_id)
+        .order_by(Bill.due_date.desc())
+        .all()
+    )
     if not active_bills:
         raise HTTPException(status_code=404, detail="No active bills found")
 
-    flats = db.query(Flat).order_by(Flat.block, Flat.flat_number).all()
+    from app.models.flat import Flat as FlatModel
+    flats = (
+        db.query(Flat)
+        .join(FlatModel.residents)
+        .filter(User.society_id == current_user.society_id)
+        .distinct()
+        .order_by(Flat.block, Flat.flat_number)
+        .all()
+    )
     society = db.query(Society).filter(Society.id == current_user.society_id).first()
     society_name = society.name if society else "Society"
 
@@ -492,8 +545,11 @@ def get_bill_residents(
     if not bill:
         raise HTTPException(status_code=404, detail="Bill not found")
 
-    # Get all potential payers (residents)
-    users = [u for u in db.query(User).filter(User.role == "resident").all() if u.is_fully_approved]
+    # Get all potential payers (residents) from the same society as the bill
+    residents_query = db.query(User).filter(User.role == "resident")
+    if bill.society_id:
+        residents_query = residents_query.filter(User.society_id == bill.society_id)
+    users = [u for u in residents_query.all() if u.is_fully_approved]
     
     # Get all payments for this bill
     payments = db.query(BillPayment).filter(BillPayment.bill_id == bill_id).all()
@@ -573,15 +629,10 @@ def pay_bill(
     db.commit()
     db.refresh(payment)
 
-    # Check for auto-archive
-    # If all residents have paid, mark bill as inactive
-    all_residents = db.query(User).filter(User.role == "resident").all()
-    total_residents = sum(1 for u in all_residents if u.is_fully_approved)
-    total_payments = db.query(BillPayment).filter(BillPayment.bill_id == data.bill_id).count()
-    
-    if total_payments >= total_residents:
-         bill.is_active = False
-         db.commit()
+    # Auto-archive only when ALL non-excluded residents have paid
+    if _is_all_residents_paid(bill, db):
+        bill.is_active = False
+        db.commit()
 
     return payment
 
@@ -819,3 +870,130 @@ def download_receipt(
         headers={"Content-Disposition": f'attachment; filename="receipt_{receipt_no}.pdf"'},
     )
 
+# ---------------------------------------------------------------------------
+# Razorpay Payment Endpoints
+# ---------------------------------------------------------------------------
+
+from pydantic import BaseModel as _BaseModel
+
+class _RazorpayOrderResponse(_BaseModel):
+    razorpay_order_id: str
+    amount: float          # in rupees (for display)
+    amount_paise: int      # in paise (for SDK)
+    currency: str
+    key_id: str            # public key – safe to send to mobile
+
+
+class _RazorpayVerifyRequest(_BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
+@router.post("/{bill_id}/create-razorpay-order", response_model=_RazorpayOrderResponse)
+def create_razorpay_order(
+    bill_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Step 1 of Razorpay checkout flow.
+    Creates a Razorpay Order for the given bill and returns the order details
+    required by the Razorpay mobile SDK to present the payment sheet.
+    """
+    from app.services.razorpay_service import create_order
+    import os
+
+    bill = db.query(Bill).filter(Bill.id == bill_id, Bill.is_active == True).first()
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    # Check the resident hasn't already paid
+    if current_user.role == "resident":
+        existing = db.query(BillPayment).filter(
+            BillPayment.bill_id == bill_id,
+            BillPayment.user_id == current_user.id,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="You have already paid this bill")
+
+    amount = _get_resident_bill_amount(bill, current_user, db) if current_user.role == "resident" else bill.amount
+
+    receipt = f"BILL-{bill_id[:20]}"
+    order = create_order(
+        amount_rupees=amount,
+        receipt=receipt,
+        notes={"bill_id": bill_id, "user_id": current_user.id},
+    )
+
+    return _RazorpayOrderResponse(
+        razorpay_order_id=order["id"],
+        amount=amount,
+        amount_paise=order["amount"],
+        currency=order["currency"],
+        key_id=(os.getenv("RAZORPAY_KEY_ID") or "").strip(),
+    )
+
+
+@router.post("/{bill_id}/verify-razorpay-payment", response_model=BillPaymentOut)
+def verify_razorpay_payment(
+    bill_id: str,
+    body: _RazorpayVerifyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Step 2 of Razorpay checkout flow.
+    Called by the mobile app after the Razorpay SDK returns a success callback.
+    Verifies the HMAC-SHA256 signature to prevent tampered/faked payments,
+    then records the payment in the database exactly like the existing pay endpoint.
+    """
+    from app.services.razorpay_service import verify_payment_signature
+
+    # Do NOT filter on is_active — the bill may have just been auto-archived
+    # by a prior request, but the payment signature is still valid and should be recorded.
+    bill = db.query(Bill).filter(Bill.id == bill_id).first()
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    # Security gate – raises 400 if signature is invalid
+    verify_payment_signature(
+        razorpay_order_id=body.razorpay_order_id,
+        razorpay_payment_id=body.razorpay_payment_id,
+        razorpay_signature=body.razorpay_signature,
+    )
+
+    # Compute the correct amount for this resident
+    amount = _get_resident_bill_amount(bill, current_user, db) if current_user.role == "resident" else bill.amount
+
+    # Record the payment (same as existing manual payment flow)
+    payment = BillPayment(
+        bill_id=bill_id,
+        user_id=current_user.id,
+        amount=amount,
+        payment_method="razorpay",
+        transaction_ref=body.razorpay_payment_id,
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+
+    # Auto-archive only when ALL non-excluded residents have paid
+    if _is_all_residents_paid(bill, db):
+        bill.is_active = False
+        db.commit()
+
+    # Push notification to admin
+    try:
+        create_notification(
+            db=db,
+            user_id=bill.created_by,
+            title="Bill Payment Received 💰",
+            body=f"{current_user.name} paid ₹{amount:,.0f} for '{bill.title}' via Razorpay.",
+            notification_type=NotificationType.BILL,
+            reference_id=bill_id,
+        )
+    except Exception:
+        pass  # Don't fail the payment if notification fails
+
+    return BillPaymentOut.model_validate(payment)

@@ -14,8 +14,14 @@ class ResidentOut:
 
 
 @router.get("")
-def list_residents(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    residents = db.query(User).options(joinedload(User.flat)).order_by(User.name).all()
+def list_residents(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    residents = (
+        db.query(User)
+        .options(joinedload(User.flat))
+        .filter(User.society_id == current_user.society_id)
+        .order_by(User.name)
+        .all()
+    )
     return [
         {
             "id": r.id,
@@ -54,10 +60,16 @@ def set_committee_role(
 
 
 @router.get("/stats")
-def resident_stats(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    total_residents = db.query(User).filter(User.role == "resident").count()
-    total_flats = db.query(Flat).count()
-    occupied_flats = db.query(Flat).filter(Flat.residents.any()).count()
+def resident_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    sid = current_user.society_id
+    total_residents = db.query(User).filter(User.role == "resident", User.society_id == sid).count()
+    total_flats = db.query(Flat).filter(Flat.society_id == sid).count()
+    occupied_flats = (
+        db.query(Flat)
+        .filter(Flat.society_id == sid)
+        .filter(Flat.residents.any(User.society_id == sid))
+        .count()
+    )
     vacant_flats = total_flats - occupied_flats
     return {
         "total_residents": total_residents,

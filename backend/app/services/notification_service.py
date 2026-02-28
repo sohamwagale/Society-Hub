@@ -94,11 +94,14 @@ def notify_all_residents(
     body: str,
     notification_type: NotificationType = NotificationType.GENERAL,
     reference_id: str | None = None,
+    society_id: str | None = None,
 ):
-    """Send a notification to all approved residents (not admins)."""
+    """Send a notification to all approved residents of a society."""
     from app.models.user import User, UserRole
-    # In a real app we might only notify approved residents, but here we notify all with role RESIDENT
-    residents = db.query(User).filter(User.role == UserRole.RESIDENT).all()
+    query = db.query(User).filter(User.role == UserRole.RESIDENT)
+    if society_id:
+        query = query.filter(User.society_id == society_id)
+    residents = query.all()
     
     notifications = []
     for resident in residents:

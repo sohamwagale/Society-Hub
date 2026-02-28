@@ -41,13 +41,24 @@ const tokenStorage = {
 };
 
 // ── Base URL ──
-// Use your machine's local network IP so Expo Go on a physical device can connect.
-// Find your IP: run `ipconfig` (Windows) or `ifconfig` (Mac/Linux).
-// const BASE_URL = 'https://vu4rynvvc2p2dlulccufo7vbti0vraom.lambda-url.ap-south-1.on.aws/api';
-const BASE_URL = 'http://192.168.1.6:8000/api';
-// const BASE_URL = 'http://10.0.2.2:8000/api'; // Android emulator only
-// const BASE_URL = 'http://localhost:8000/api';  // iOS simulator / web only
-const api = axios.create({ baseURL: BASE_URL, timeout: 10000 });
+// Using ngrok tunnel — works from any network (WiFi, mobile data, etc.)
+// Each ngrok session gives a new URL. Paste it below and hot-reload.
+// When deploying to EC2, replace NGROK_URL with your EC2 domain permanently.
+// const NGROK_URL = 'https://straked-noncadent-clifton.ngrok-free.dev/api';
+const LOCAL_URL = 'http://192.168.1.5:8000/api'; // ← use this if ngrok is not running
+const NGROK_URL = 'http://13.126.10.73:8000/api'; // EC2 — permanent!
+
+
+const BASE_URL = NGROK_URL; // switch to LOCAL_URL for same-WiFi dev without ngrok
+
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 15000,
+  headers: { 'ngrok-skip-browser-warning': '1' },
+});
+
+// publicApi = same instance; ngrok is reachable from all networks including mobile data.
+export const publicApi = api;
 
 // Attach JWT token to every request
 api.interceptors.request.use(async (config) => {
@@ -110,7 +121,7 @@ export const billsAPI = {
     const params: any = {};
     if (billType) params.bill_type = billType;
     if (activeOnly !== undefined) params.active_only = activeOnly;
-    const { data } = await api.get<Bill[]>('/bills/', { params });
+    const { data } = await api.get<Bill[]>('/bills', { params });
     return data;
   },
   get: async (id: string): Promise<Bill> => {
@@ -122,7 +133,7 @@ export const billsAPI = {
     return data;
   },
   create: async (bill: BillCreate): Promise<Bill> => {
-    const { data } = await api.post<Bill>('/bills/', bill);
+    const { data } = await api.post<Bill>('/bills', bill);
     return data;
   },
   pay: async (payment: PayBillRequest): Promise<BillPayment> => {
@@ -156,6 +167,24 @@ export const billsAPI = {
     const token = await tokenStorage.get();
     return `${BASE_URL}/bills/export-report?token=${encodeURIComponent(token || '')}`;
   },
+  createRazorpayOrder: async (billId: string): Promise<{
+    razorpay_order_id: string;
+    amount: number;
+    amount_paise: number;
+    currency: string;
+    key_id: string;
+  }> => {
+    const { data } = await api.post(`/bills/${billId}/create-razorpay-order`);
+    return data;
+  },
+  verifyRazorpayPayment: async (billId: string, payload: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }): Promise<BillPayment> => {
+    const { data } = await api.post<BillPayment>(`/bills/${billId}/verify-razorpay-payment`, payload);
+    return data;
+  },
 };
 
 // ── Society Expenses ──
@@ -187,6 +216,9 @@ export const expensesAPI = {
     return data;
   },
   getDocumentUrl: (path: string): string => {
+    // If already a full URL (Supabase or any https://...), return as-is.
+    // Legacy local paths like /uploads/... remain prefixed with base for backward compat.
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return BASE_URL.replace('/api', '') + path;
   },
 };

@@ -1,45 +1,43 @@
+"""
+Local file storage utility.
+Files are saved to the backend's `uploads/` directory and served via the
+static files mount at /uploads (configured in main.py).
+
+On EC2, the uploads/ directory lives alongside the backend code on the 8 GB EBS
+volume — no Supabase or external storage dependency.
+"""
 import os
-from supabase import create_client, Client
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
-SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "society-uploads")
-
-_client: Client | None = None
-
-
-def get_supabase() -> Client:
-    global _client
-    if _client is None:
-        _client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    return _client
+# Root of the backend project (one level above app/)
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+UPLOADS_DIR = os.path.join(_BASE_DIR, "uploads")
 
 
 def upload_file(folder: str, filename: str, data: bytes, content_type: str) -> str:
-    """Upload a file to Supabase Storage and return the public URL."""
-    client = get_supabase()
-    path = f"{folder}/{filename}"
-    client.storage.from_(SUPABASE_BUCKET).upload(
-        path=path,
-        file=data,
-        file_options={"content-type": content_type, "upsert": "true"},
-    )
-    public_url = client.storage.from_(SUPABASE_BUCKET).get_public_url(path)
-    return public_url
+    """
+    Save a file to the local uploads directory and return its URL path.
+    The returned path is relative, e.g. /uploads/documents/uuid.pdf
+    This path is directly accessible via the /uploads static mount.
+    """
+    dest_dir = os.path.join(UPLOADS_DIR, folder)
+    os.makedirs(dest_dir, exist_ok=True)
+
+    file_path = os.path.join(dest_dir, filename)
+    with open(file_path, "wb") as f:
+        f.write(data)
+
+    # Return the relative URL path — the frontend prepends the base URL
+    return f"/uploads/{folder}/{filename}"
 
 
-def delete_file(public_url: str) -> None:
-    """Delete a file from Supabase Storage given its public URL."""
-    if not public_url:
+def delete_file(path: str) -> None:
+    """Delete a locally-stored upload file given its URL path (/uploads/...)."""
+    if not path:
         return
     try:
-        # Extract path after bucket name from public URL
-        # e.g. https://<project>.supabase.co/storage/v1/object/public/<bucket>/<path>
-        marker = f"/object/public/{SUPABASE_BUCKET}/"
-        idx = public_url.find(marker)
-        if idx == -1:
-            return
-        path = public_url[idx + len(marker):]
-        get_supabase().storage.from_(SUPABASE_BUCKET).remove([path])
+        if path.startswith("/uploads/"):
+            file_path = os.path.join(UPLOADS_DIR, path[len("/uploads/"):])
+            if os.path.exists(file_path):
+                os.remove(file_path)
     except Exception:
-        pass  # Best-effort deletion; don't fail the request if delete fails
+        pass  # Best-effort deletion; don't fail the request

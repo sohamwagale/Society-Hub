@@ -21,6 +21,7 @@ def create_poll(
 ):
     poll = Poll(
         id=str(uuid.uuid4()),
+        society_id=admin.society_id,
         title=data.title,
         description=data.description,
         created_by=admin.id,
@@ -37,11 +38,12 @@ def create_poll(
     db.commit()
     db.refresh(poll)
 
-    # Notify all residents
+    # Notify all residents of this society
     notify_all_residents(
         db, f"New Poll: {poll.title}",
         f"Vote before {poll.deadline.strftime('%d %b %Y %H:%M')}",
         NotificationType.POLL, poll.id,
+        society_id=admin.society_id,
     )
 
     return _poll_to_out(poll, None)
@@ -49,7 +51,12 @@ def create_poll(
 
 @router.get("", response_model=list[PollOut])
 def list_polls(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    polls = db.query(Poll).order_by(Poll.created_at.desc()).all()
+    polls = (
+        db.query(Poll)
+        .filter(Poll.society_id == current_user.society_id)
+        .order_by(Poll.created_at.desc())
+        .all()
+    )
     return [_poll_to_out(p, current_user.id, db) for p in polls]
 
 

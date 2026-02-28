@@ -159,7 +159,7 @@ export default function DashboardScreen({ navigation }: any) {
               { icon: 'account-check', label: 'Approvals', route: 'ApprovalManagement', color: '#FF6D00' },
             ] : []),
           ].map((link, index) => (
-            <View key={link.label} style={{ width: '31%', marginBottom: 12 }}>
+            <View key={link.label} style={{ width: '33.33%', paddingHorizontal: 6, marginBottom: 12 }}>
               <TouchableRipple onPress={() => navigation.navigate(link.route)} borderless style={styles.quickLink}>
                 <Surface style={styles.quickLinkCard} elevation={1}>
                   <MaterialCommunityIcons name={link.icon as any} size={28} color={link.color} />
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', paddingHorizontal: 12, paddingTop: 8 },
   analyticsCard: { backgroundColor: '#1A1A2E', borderRadius: 16, padding: 16, marginHorizontal: 16, marginVertical: 4 },
   analyticsRow: { flexDirection: 'row', gap: 16 },
-  quickLinksRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 12, rowGap: 4, justifyContent: 'space-between', marginBottom: 8 },
+  quickLinksRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, marginBottom: 8 },
   quickLink: { flex: 1, borderRadius: 16 },
   quickLinkCard: { backgroundColor: '#1A1A2E', borderRadius: 16, padding: 16, alignItems: 'center', paddingVertical: 14 },
   card: { backgroundColor: '#1A1A2E', borderRadius: 16, padding: 16, marginHorizontal: 16, marginVertical: 4 },

@@ -13,3 +13,148 @@ To deploy om aws lambda enable the current setting seen on Society Function
   5.Convert the above to zip file named layers.zip and upload as layer and connect the layer via ARN number
   6.upload code
   7.Create functional url
+
+
+# 📌 What You Should Do Now (Important)
+
+Since you’re stopping here, just remember these 4 commands:
+
+### Check status
+
+```bash
+sudo systemctl status societyhub
+```
+
+### Restart after code changes
+
+```bash
+sudo systemctl restart societyhub
+```
+
+### View logs
+
+```bash
+journalctl -u societyhub -f
+```
+
+### Stop service
+
+```bash
+sudo systemctl stop societyhub
+```
+
+---
+
+# 🧠 Very Important Rule
+
+Whenever you:
+
+* Pull new code
+* Modify backend files
+* Update dependencies
+
+You MUST restart:
+
+```bash
+sudo systemctl restart societyhub
+```
+
+Otherwise changes won’t reflect.
+
+---
+
+You’re in a clean, correct deployment state now.
+
+Honestly — good job.
+This is proper backend deployment, not hacky stuff.
+
+If anything breaks later, just paste logs and we’ll debug it fast 🚀
+
+
+Your app is now fully self-hosted — no Lambda, no ngrok, no Supabase DB, no same-WiFi limitation. Just a clean EC2 instance running everything.
+
+When you're ready to deploy code updates later:
+
+scp -i "C:\Users\soham\.ssh\soc.pem" -r "E:\Programs\projects\soc\backend" ec2-user@13.126.10.73:/home/ec2-user/
+ssh -i "C:\Users\soham\.ssh\soc.pem" ec2-user@13.126.10.73 "sudo systemctl restart societyhub"
+
+
+✅ Step 1 — SSH Into EC2
+
+From Windows:
+
+ssh -i "C:\Users\soham\.ssh\soc.pem" ec2-user@13.126.10.73
+✅ Step 2 — Delete the Existing Backend Folder
+
+Once inside EC2:
+
+ls
+
+You should see backend
+
+Now remove it completely:
+
+rm -rf backend
+
+⚠️ rm -rf permanently deletes — make sure you're deleting the correct folder.
+
+Verify:
+
+ls
+
+It should be gone.
+
+✅ Step 3 — Exit EC2
+exit
+
+You should be back to:
+
+PS C:\Users\soham>
+✅ Step 4 — Re-copy Without venv (Clean Way)
+🔥 BEST METHOD (Professional Way)
+
+Instead of manually moving folders every time, use this:
+
+From Windows:
+
+scp -i "C:\Users\soham\.ssh\soc.pem" -r `
+E:\Programs\projects\soc\backend\* `
+ec2-user@13.126.10.73:/home/ec2-user/backend
+
+Notice:
+
+backend\*
+
+That copies only contents, not the entire folder including hidden stuff like venv (if excluded).
+
+If venv is inside backend, it will still copy — so better approach below 👇
+
+💎 BEST PRACTICE METHOD (Recommended)
+
+Create a .gitignore-style exclude using tar:
+
+From Windows:
+
+cd E:\Programs\projects\soc
+
+tar --exclude="backend/venv" -czf backend.tar.gz backend
+
+Then upload:
+
+scp -i "C:\Users\soham\.ssh\soc.pem" backend.tar.gz ec2-user@13.126.10.73:/home/ec2-user/
+
+SSH back in:
+
+tar -xzf backend.tar.gz
+rm backend.tar.gz
+
+This guarantees venv is not copied.
+
+✅ Step 5 — Recreate venv on EC2
+
+Inside EC2:
+
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt

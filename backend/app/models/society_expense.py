@@ -9,6 +9,7 @@ class SocietyExpense(Base):
     __tablename__ = "society_expenses"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    society_id = Column(String, ForeignKey("societies.id"), nullable=True, index=True)
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     amount = Column(Float, nullable=False)

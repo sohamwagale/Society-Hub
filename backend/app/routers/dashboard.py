@@ -18,36 +18,38 @@ router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 @router.get("/stats")
 def dashboard_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     is_admin = current_user.role == UserRole.ADMIN
+    sid = current_user.society_id
 
-    # Billing stats
-    total_bills = db.query(Bill).count()
-    all_bills = db.query(Bill).all()
+    # Billing stats (scoped to this society)
+    total_bills = db.query(Bill).filter(Bill.society_id == sid).count()
+    all_bills = db.query(Bill).filter(Bill.society_id == sid).all()
 
     # Build flat override lookup: (bill_id, flat_id) -> custom amount
-    overrides = db.query(BillFlatAmount).all()
+    bill_ids = [b.id for b in all_bills]
+    overrides = db.query(BillFlatAmount).filter(BillFlatAmount.bill_id.in_(bill_ids)).all() if bill_ids else []
     override_dict = {(o.bill_id, o.flat_id): o.amount for o in overrides}
 
-    # Find occupied (non-vacant) flats: flats that have at least one approved resident
-    # NOTE: is_fully_approved is a @property, not a DB column — must filter in Python
+    # Find occupied (non-vacant) flats within this society
     all_residents = db.query(User).filter(
         User.role == UserRole.RESIDENT,
+        User.society_id == sid,
         User.flat_id.isnot(None),
     ).all()
     approved_residents = [u for u in all_residents if u.is_fully_approved]
     occupied_flat_ids = list({u.flat_id for u in approved_residents})
 
-    # Pre-fetch all payments grouped by bill
-    all_payments = db.query(BillPayment).all()
+    # Pre-fetch all payments grouped by bill (for this society's bills)
+    all_payments = db.query(BillPayment).filter(BillPayment.bill_id.in_(bill_ids)).all() if bill_ids else []
     payments_by_bill: dict[str, list] = {}
     for p in all_payments:
         payments_by_bill.setdefault(p.bill_id, []).append(p)
 
     # Build paid flat IDs per bill
     paid_flats_by_bill: dict[str, set] = {}
-    for bill_id, bill_payments in payments_by_bill.items():
+    for b_id, bill_payments in payments_by_bill.items():
         payer_ids = {p.user_id for p in bill_payments}
         payer_users = db.query(User).filter(User.id.in_(payer_ids)).all()
-        paid_flats_by_bill[bill_id] = {u.flat_id for u in payer_users if u.flat_id}
+        paid_flats_by_bill[b_id] = {u.flat_id for u in payer_users if u.flat_id}
 
     total_bill_amount = 0
     total_collected = 0
@@ -55,15 +57,17 @@ def dashboard_stats(db: Session = Depends(get_db), current_user: User = Depends(
     for bill in all_bills:
         paid_flat_ids = paid_flats_by_bill.get(bill.id, set())
         for flat_id in occupied_flat_ids:
-            # Get the amount this flat owes (custom override or default bill amount)
             amt = override_dict.get((bill.id, flat_id), bill.amount)
             if amt == 0:
-                continue  # flat excluded from this bill
+                continue
             total_bill_amount += amt
             if flat_id in paid_flat_ids:
                 total_collected += amt
 
-    overdue_bills = db.query(Bill).filter(Bill.due_date < date.today()).count()
+    overdue_bills = db.query(Bill).filter(
+        Bill.society_id == sid,
+        Bill.due_date < date.today(),
+    ).count()
 
     # Personal billing (for residents)
     if not is_admin:
@@ -81,31 +85,35 @@ def dashboard_stats(db: Session = Depends(get_db), current_user: User = Depends(
     else:
         my_paid = total_collected
         my_bills_count = total_bills
-        my_paid_count = db.query(BillPayment).count()
+        my_paid_count = db.query(BillPayment).filter(BillPayment.bill_id.in_(bill_ids)).count() if bill_ids else 0
 
-    # Complaint stats
-    total_complaints = db.query(Complaint).count()
-    open_complaints = db.query(Complaint).filter(Complaint.status == ComplaintStatus.OPEN).count()
-    in_progress_complaints = db.query(Complaint).filter(Complaint.status == ComplaintStatus.IN_PROGRESS).count()
-    resolved_complaints = db.query(Complaint).filter(Complaint.status == ComplaintStatus.RESOLVED).count()
+    # Complaint stats (scoped to this society)
+    total_complaints = db.query(Complaint).filter(Complaint.society_id == sid).count()
+    open_complaints = db.query(Complaint).filter(Complaint.society_id == sid, Complaint.status == ComplaintStatus.OPEN).count()
+    in_progress_complaints = db.query(Complaint).filter(Complaint.society_id == sid, Complaint.status == ComplaintStatus.IN_PROGRESS).count()
+    resolved_complaints = db.query(Complaint).filter(Complaint.society_id == sid, Complaint.status == ComplaintStatus.RESOLVED).count()
 
-    # Poll stats
-    total_polls = db.query(Poll).count()
-    active_polls = db.query(Poll).filter(Poll.is_active == True).count()
-    total_votes = db.query(Vote).count()
+    # Poll stats (scoped to this society)
+    total_polls = db.query(Poll).filter(Poll.society_id == sid).count()
+    active_polls = db.query(Poll).filter(Poll.society_id == sid, Poll.is_active == True).count()
+    poll_ids = [p.id for p in db.query(Poll).filter(Poll.society_id == sid).all()]
+    total_votes = db.query(Vote).filter(Vote.poll_id.in_(poll_ids)).count() if poll_ids else 0
 
-    # Reimbursement stats
-    total_reimbursements = db.query(ReimbursementRequest).count()
+    # Reimbursement stats (scoped to this society)
+    from app.models.reimbursement import ReimbursementRequest, ReimbursementStatus
+    total_reimbursements = db.query(ReimbursementRequest).filter(ReimbursementRequest.society_id == sid).count()
     pending_reimbursements = db.query(ReimbursementRequest).filter(
-        ReimbursementRequest.status == ReimbursementStatus.SUBMITTED
+        ReimbursementRequest.society_id == sid,
+        ReimbursementRequest.status == ReimbursementStatus.SUBMITTED,
     ).count()
     approved_amount = db.query(func.sum(ReimbursementRequest.approved_amount)).filter(
-        ReimbursementRequest.status.in_([ReimbursementStatus.APPROVED, ReimbursementStatus.PAID])
+        ReimbursementRequest.society_id == sid,
+        ReimbursementRequest.status.in_([ReimbursementStatus.APPROVED, ReimbursementStatus.PAID]),
     ).scalar() or 0
 
-    # Resident stats
-    total_residents = db.query(User).filter(User.role == UserRole.RESIDENT).count()
-    total_flats = db.query(Flat).count()
+    # Resident and flat stats (scoped to this society)
+    total_residents = db.query(User).filter(User.role == UserRole.RESIDENT, User.society_id == sid).count()
+    total_flats = db.query(Flat).filter(Flat.society_id == sid).count()
 
     return {
         "billing": {

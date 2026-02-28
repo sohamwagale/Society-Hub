@@ -34,6 +34,12 @@ app.include_router(onboarding.router)
 app.include_router(society_expenses.router)
 app.include_router(society_documents.router)
 
+# Serve locally-stored uploads (backward compat for files saved before Supabase).
+# New uploads go directly to Supabase Storage and don't use this path.
+_uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'uploads')
+os.makedirs(_uploads_dir, exist_ok=True)
+app.mount('/uploads', StaticFiles(directory=_uploads_dir), name='uploads')
+
 
 
 @app.get("/")

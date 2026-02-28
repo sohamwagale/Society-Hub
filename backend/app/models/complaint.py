@@ -26,6 +26,7 @@ class Complaint(Base):
     __tablename__ = "complaints"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    society_id = Column(String, ForeignKey("societies.id"), nullable=True, index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     category = Column(SAEnum(ComplaintCategory), nullable=False, default=ComplaintCategory.OTHER)
     title = Column(String(200), nullable=False)

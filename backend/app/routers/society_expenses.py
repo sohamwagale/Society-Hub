@@ -44,6 +44,7 @@ async def create_expense(
 
     expense = SocietyExpense(
         id=expense_id,
+        society_id=admin.society_id,
         title=title,
         description=description,
         amount=amount,
@@ -64,7 +65,7 @@ def list_expenses(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = db.query(SocietyExpense)
+    query = db.query(SocietyExpense).filter(SocietyExpense.society_id == current_user.society_id)
 
     if sort_by == "date_desc":
         query = query.order_by(SocietyExpense.expense_date.desc())
