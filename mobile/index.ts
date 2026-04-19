@@ -1,8 +1,13 @@
+// Import the registration utility from Expo core to bootstrap the application
 import { registerRootComponent } from 'expo';
 
+// Import the root App component which contains the navigation and provider logic
 import App from './App';
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
+/**
+ * registerRootComponent:
+ * 1. Internally calls AppRegistry.registerComponent('main', () => App) from React Native.
+ * 2. Bridges the gap between Expo Go and standalone native builds.
+ * 3. Ensures the application's root component is correctly hooked into the native UI layer.
+ */
 registerRootComponent(App);

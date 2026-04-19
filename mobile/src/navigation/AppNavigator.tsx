@@ -1,28 +1,38 @@
+// Import React hooks for component lifecycle and state management
 import React, { useEffect, useRef } from 'react';
+// Import essential layout and UI feedback components from React Native
 import { ActivityIndicator, View } from 'react-native';
+// Import NavigationContainer to wrap the app and useNavigationContainerRef for programmatic portal navigation
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
+// Import optimized native navigator builders
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+// Import community-standard icons
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+// Import themed text component for consistent UI styling
 import { Text } from 'react-native-paper';
+// Import auth store to derive navigation state from user session
 import { useAuthStore } from '../store';
+// Import push notification library for deep-link handling
 import * as Notifications from 'expo-notifications';
+// Import custom push utilities for token orchestration
 import { usePushNotifications } from '../utils/pushNotifications';
+// Import auth API to register hardware tokens with the server
 import { authAPI } from '../services/api';
 
 // ── Auth Screens ──
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
 
-// ── Onboarding Screens (authenticated, no society) ──
+// ── Onboarding Screens (authenticated users without a society) ──
 import OnboardingChoiceScreen from '../screens/Auth/OnboardingChoiceScreen';
 import JoinSocietyScreen from '../screens/Auth/JoinSocietyScreen';
 import CreateSocietyScreen from '../screens/Auth/CreateSocietyScreen';
 
-// ── Pending Approval ──
+// ── KYC/Pending State ──
 import PendingApprovalScreen from '../screens/Auth/PendingApprovalScreen';
 
-// ── Main App Screens ──
+// ── Feature Domain Screens ──
 import DashboardScreen from '../screens/Home/DashboardScreen';
 import BillsListScreen from '../screens/Bills/BillsListScreen';
 import BillDetailScreen from '../screens/Bills/BillDetailScreen';
@@ -50,6 +60,7 @@ import SocietyDocumentsListScreen from '../screens/Documents/SocietyDocumentsLis
 import UploadDocumentScreen from '../screens/Documents/UploadDocumentScreen';
 import DocumentDetailScreen from '../screens/Documents/DocumentDetailScreen';
 
+// Initialize specialized stack builders
 const Stack = createNativeStackNavigator();
 const Tab = createMaterialTopTabNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -58,11 +69,16 @@ const ComplaintsStack = createNativeStackNavigator();
 const PollsStack = createNativeStackNavigator();
 const MoreStack = createNativeStackNavigator();
 
+/**
+ * Global Screen Options:
+ * Projects a unified theme (Space Navy) and consistent header typography across all stacks.
+ */
 const screenOptions = {
   headerStyle: { backgroundColor: '#0F0F1A' },
   headerTintColor: '#E8E8F0',
   headerTitleStyle: { fontWeight: '700' as const, fontSize: 18 },
   contentStyle: { backgroundColor: '#0F0F1A' },
+  // Custom header title implementation for better padding and control
   headerTitle: (props: any) => (
     <View style={{ paddingVertical: 20 }}>
       <Text style={{
@@ -76,7 +92,12 @@ const screenOptions = {
   ),
 };
 
-// ── Stack Navigators ──
+// ── Sub-Stack Navigators ──
+
+/**
+ * Home Activity Stack:
+ * Handles the main landing area, notifications, and core society management reports.
+ */
 function HomeStackNavigator() {
   return (
     <HomeStack.Navigator screenOptions={screenOptions}>
@@ -100,6 +121,10 @@ function HomeStackNavigator() {
   );
 }
 
+/**
+ * Democracy Stack:
+ * Dedicated flow for voting and viewing community survey results.
+ */
 function PollsStackNavigator() {
   return (
     <PollsStack.Navigator screenOptions={screenOptions}>
@@ -110,6 +135,10 @@ function PollsStackNavigator() {
   );
 }
 
+/**
+ * Finance Stack:
+ * Orchestrates billing cycles, resident payments, and administrative expense tracking.
+ */
 function BillsStackNavigator() {
   return (
     <BillsStack.Navigator screenOptions={screenOptions}>
@@ -124,6 +153,10 @@ function BillsStackNavigator() {
   );
 }
 
+/**
+ * Helpdesk Stack:
+ * Focuses on grievance reporting and two-way resolution tracking.
+ */
 function ComplaintsStackNavigator() {
   return (
     <ComplaintsStack.Navigator screenOptions={screenOptions}>
@@ -134,6 +167,10 @@ function ComplaintsStackNavigator() {
   );
 }
 
+/**
+ * Profile & Settings Stack:
+ * Acts as an overflow menu for less frequent interactions and personal configuration.
+ */
 function MoreStackNavigator() {
   return (
     <MoreStack.Navigator screenOptions={screenOptions}>
@@ -157,7 +194,12 @@ function MoreStackNavigator() {
   );
 }
 
-// ── Main Tabs ──
+// ── Unified Bottom Navigation ──
+
+/**
+ * MainTabs:
+ * The primary navigation hub of the app, using TopTabs inside Bottom container for smooth swiping.
+ */
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -168,6 +210,7 @@ function MainTabs() {
         animationEnabled: false,
         tabBarShowIcon: true,
         tabBarShowLabel: true,
+        // Visual indicator shown at the TOP of the bottom bar
         tabBarIndicatorStyle: { top: 0, backgroundColor: '#7C4DFF', height: 2 },
         tabBarStyle: {
           backgroundColor: '#0F0F1A',
@@ -223,7 +266,10 @@ function MainTabs() {
   );
 }
 
-// ── Auth Stack (not logged in) ──
+/**
+ * AuthStack:
+ * Gateway navigator for unauthenticated guests.
+ */
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ ...screenOptions, headerShown: false }}>
@@ -233,7 +279,10 @@ function AuthStack() {
   );
 }
 
-// ── Onboarding Stack (logged in, no society) ──
+/**
+ * OnboardingStack:
+ * Temporary flow for a verified user who hasn't yet selected an organization.
+ */
 function OnboardingStack() {
   return (
     <Stack.Navigator screenOptions={{ ...screenOptions, headerShown: false }}>
@@ -244,7 +293,11 @@ function OnboardingStack() {
   );
 }
 
-// Notification type → tab & screen mapping
+/**
+ * NOTIF_NAV_MAP:
+ * Bridges push notification data payloads to internal navigation paths.
+ * Allows 'Smart Routing' — clicking a pill notification takes you straight to the relevant detail screen.
+ */
 const NOTIF_NAV_MAP: Record<string, { tab: string; screen: string; paramKey: string }> = {
   bill: { tab: 'BillsTab', screen: 'BillDetail', paramKey: 'billId' },
   payment_reminder: { tab: 'BillsTab', screen: 'BillDetail', paramKey: 'billId' },
@@ -256,16 +309,15 @@ const NOTIF_NAV_MAP: Record<string, { tab: string; screen: string; paramKey: str
 
 
 export default function AppNavigator() {
+  // Extract reactive session state from the global store
   const { user, isAuthenticated, isLoading, loadUser } = useAuthStore();
+  // Persistent reference for programmatic navigation actions
   const navigationRef = useNavigationContainerRef<any>();
 
+  // Hook into hardware-level notification events
   const { expoPushToken, notificationResponse } = usePushNotifications();
 
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  // Send the token to the backend when it arrives and user is authenticated
+  // Side-effect: Sync hardware push token with the backend profile once we have identity and permission
   useEffect(() => {
     if (isAuthenticated && user?.is_fully_approved && expoPushToken) {
       authAPI.registerPushToken(expoPushToken.data)
@@ -274,63 +326,59 @@ export default function AppNavigator() {
     }
   }, [isAuthenticated, user?.is_fully_approved, expoPushToken]);
 
-
-
+  // Track if the React Navigation context is ready to receive instructions
   const [isNavigationReady, setIsNavigationReady] = React.useState(false);
 
-  // 4-state navigation
+  /**
+   * getNavigationState:
+   * Finite State Machine for app identity and access control.
+   */
   const getNavigationState = () => {
     if (!isAuthenticated || !user) return 'auth';
-    if (!user.society_id) return 'onboarding';
-    if (!user.is_fully_approved) return 'pending';
-    return 'main';
+    if (!user.society_id) return 'onboarding'; // No org selected
+    if (!user.is_fully_approved) return 'pending'; // Awaiting KYC/Admin approval
+    return 'main'; // Full access
   };
 
   const state = getNavigationState();
 
-  // Handle notification taps (cold-start or foreground) once navigation is ready
+  // Watch for notification interactions; trigger routing once the container is ready and user is in 'main' state
   useEffect(() => {
-    console.log('[DEBUG-PUSH] Trying handle. Response:', !!notificationResponse, 'Ready:', isNavigationReady, 'State:', state);
     if (notificationResponse && isNavigationReady && state === 'main') {
-      const resp = notificationResponse as any;
-      console.log('[DEBUG-PUSH] Notification tapped:', JSON.stringify(resp.notification.request.content.data));
       handleNotificationTap(notificationResponse);
     }
   }, [notificationResponse, isNavigationReady, state]);
 
+  /**
+   * handleNotificationTap:
+   * Maps incoming notification data to a nested navigation jump.
+   */
   const handleNotificationTap = (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data as {
       type?: string;
       reference_id?: string;
     };
 
-    console.log('[DEBUG-PUSH] Extracted Data:', data);
-    if (!data?.type || !navigationRef.isReady()) {
-      console.log('[DEBUG-PUSH] Aborting: No type or nav not ready');
-      return;
-    }
+    if (!data?.type || !navigationRef.isReady()) return;
 
     const mapping = NOTIF_NAV_MAP[data.type];
-    console.log('[DEBUG-PUSH] Found Mapping:', mapping);
-
     if (mapping) {
       if (!data.reference_id) {
-        console.log(`[DEBUG-PUSH] Navigating to ${mapping.tab} -> ${mapping.screen} (No Params)`);
+        // Simple screen jump (e.g., Announcements feed)
         (navigationRef as any).navigate(mapping.tab, {
           screen: mapping.screen,
         });
       } else {
-        console.log(`[DEBUG-PUSH] Navigating to ${mapping.tab} -> ${mapping.screen} with Param: { ${mapping.paramKey}: ${data.reference_id} }`);
+        // Parameterized jump (e.g., specific Bill detail)
         (navigationRef as any).navigate(mapping.tab, {
           screen: mapping.screen,
           params: { [mapping.paramKey]: data.reference_id },
         });
       }
-    } else {
-      console.log('[DEBUG-PUSH] No mapping configured for type:', data.type);
     }
   };
 
+  // Show a premium splash indicator while hydrating the secure storage and auth state
   if (isLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: '#0F0F1A', justifyContent: 'center', alignItems: 'center' }}>
@@ -339,6 +387,7 @@ export default function AppNavigator() {
     );
   }
 
+  // Render the appropriate navigator based on the calculated identity state
   return (
     <NavigationContainer
       ref={navigationRef}

@@ -1,27 +1,44 @@
+// Import React and hooks for data orchestration and focus-aware updates
 import React, { useState, useCallback } from 'react';
+// Import layout, interaction, and system-level capability modules (Refresh, Linking)
 import { View, FlatList, StyleSheet, RefreshControl, Alert, Image, Linking } from 'react-native';
+// Import themed MD3 components from React Native Paper
 import { Text, Surface, FAB, Button, TextInput, Portal, Modal, TouchableRipple } from 'react-native-paper';
+// Import community icons for visual categorization of notices
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+// Import picker modules for binary attachments (Notices with supplementary PDFs or images)
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+// Import global stores for announcement state and user permissions
 import { useAnnouncementsStore, useAuthStore } from '../../store';
+// Import backend service for announcement operations
 import { announcementsAPI } from '../../services/api';
+// Import common UI loading and empty state wrappers
 import { EmptyState, LoadingScreen } from '../../components/Common';
+// Import shared TypeScript definitions
 import { Announcement, AnnouncementPriority } from '../../types';
+// Import navigation focus hook to ensure the feed is always fresh
 import { useFocusEffect } from '@react-navigation/native';
 
+// ── Priority Theming: Color coding for community awareness ──
 const PRIORITY_CONFIG: Record<AnnouncementPriority, { color: string; icon: string; bg: string }> = {
-  normal: { color: '#7C4DFF', icon: 'bullhorn', bg: '#1A1A3E' },
-  important: { color: '#FFB74D', icon: 'alert', bg: '#2E2A0E' },
-  urgent: { color: '#FF5252', icon: 'alert-octagon', bg: '#2E0E0E' },
+  normal: { color: '#7C4DFF', icon: 'bullhorn', bg: '#1A1A3E' },       // Standard updates
+  important: { color: '#FFB74D', icon: 'alert', bg: '#2E2A0E' },      // Required reading
+  urgent: { color: '#FF5252', icon: 'alert-octagon', bg: '#2E0E0E' }, // Immediate action required
 };
 
+/**
+ * AnnouncementsScreen:
+ * The "digital bulletin board" of the society. 
+ * Allows admins to broadcast news, pin critical info, and attach documentation.
+ */
 export default function AnnouncementsScreen() {
+  // ── Global State & Auth ──
   const { announcements, loading, fetchAnnouncements } = useAnnouncementsStore();
   const user = useAuthStore(s => s.user);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Create/Edit State
+  // ── Form State (Modal logic) ──
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -32,9 +49,23 @@ export default function AnnouncementsScreen() {
   const [attachmentUri, setAttachmentUri] = useState<string | null>(null);
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
 
+  // Synchronize with the cloud on entry
   useFocusEffect(useCallback(() => { fetchAnnouncements(); }, []));
-  const onRefresh = async () => { setRefreshing(true); await fetchAnnouncements(); setRefreshing(false); };
+  
+  /**
+   * onRefresh:
+   * Triggers the "pull-to-refresh" gesture for manual synchronization.
+   */
+  const onRefresh = async () => { 
+    setRefreshing(true); 
+    await fetchAnnouncements(); 
+    setRefreshing(false); 
+  };
 
+  /**
+   * openCreate:
+   * Prepares the modal for a fresh announcement broadcast.
+   */
   const openCreate = () => {
     setIsEditing(false); setEditId(null);
     setTitle(''); setBody(''); setPriority('normal');
@@ -42,6 +73,10 @@ export default function AnnouncementsScreen() {
     setShowModal(true);
   };
 
+  /**
+   * openEdit:
+   * Pre-fills the modal with existing announcement metadata for modification.
+   */
   const openEdit = (item: Announcement) => {
     setIsEditing(true); setEditId(item.id);
     setTitle(item.title); setBody(item.body); setPriority(item.priority as AnnouncementPriority);
@@ -49,8 +84,12 @@ export default function AnnouncementsScreen() {
     setShowModal(true);
   };
 
+  /**
+   * pickAttachment:
+   * Multi-modal picker allowing admins to attach context (Image vs PDF).
+   */
   const pickAttachment = () => {
-    Alert.alert('Attach File', 'Choose source', [
+    Alert.alert('Attach Context', 'Select attachment source', [
       {
         text: 'Photo Library', onPress: async () => {
           const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
@@ -61,7 +100,7 @@ export default function AnnouncementsScreen() {
         }
       },
       {
-        text: 'Document (PDF)', onPress: async () => {
+        text: 'Standard Document (PDF)', onPress: async () => {
           const result = await DocumentPicker.getDocumentAsync({ type: ['application/pdf'], copyToCacheDirectory: true });
           if (!result.canceled && result.assets[0]) {
             setAttachmentUri(result.assets[0].uri);
@@ -73,62 +112,88 @@ export default function AnnouncementsScreen() {
     ]);
   };
 
+  /**
+   * handleSave:
+   * Orchestrates the creation or update of an announcement.
+   * Handles binary payload delivery in creation mode.
+   */
   const handleSave = async () => {
-    if (!title || !body) { Alert.alert('Error', 'Title and body are required'); return; }
+    if (!title || !body) { Alert.alert('Incomplete Form', 'Heading and Content are mandatory.'); return; }
     setSaving(true);
     try {
       if (isEditing && editId) {
+        // Direct field update for existing notices
         await announcementsAPI.update(editId, { title, body, priority });
-        Alert.alert('Success', 'Announcement updated');
+        Alert.alert('Updated', 'The announcement has been revised.');
       } else {
+        // Multi-part submission for new notices with potential attachments
         await announcementsAPI.create({ title, body, priority }, attachmentUri || undefined);
-        Alert.alert('Success', 'Announcement posted');
+        Alert.alert('Broadcasted', 'The announcement is now visible to all residents.');
       }
       setShowModal(false);
       fetchAnnouncements();
-    } catch (e: any) { Alert.alert('Error', e.response?.data?.detail || 'Failed'); }
-    finally { setSaving(false); }
+    } catch (e: any) { 
+      Alert.alert('Error', e.response?.data?.detail || 'Failed to post notice'); 
+    } finally { 
+      setSaving(false); 
+    }
   };
 
+  /**
+   * handleDelete:
+   * Administrative tool to prune the bulletin board.
+   */
   const handleDelete = (id: string) => {
-    Alert.alert('Delete', 'Remove this announcement?', [
-      { text: 'Cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          await announcementsAPI.delete(id); fetchAnnouncements();
-        }
-      }
+    Alert.alert('Discard Notice', 'Are you sure? This will remove the notice for all residents.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: async () => { await announcementsAPI.delete(id); fetchAnnouncements(); } }
     ]);
   };
 
+  /**
+   * handleTogglePin:
+   * Prioritizes high-value info at the top of the feed.
+   */
   const handleTogglePin = async (id: string) => {
-    await announcementsAPI.togglePin(id); fetchAnnouncements();
+    await announcementsAPI.togglePin(id); 
+    fetchAnnouncements();
   };
 
+  /**
+   * openAttachment:
+   * Handover to system browser or native viewer for announcement assets.
+   */
   const openAttachment = async (item: Announcement) => {
     if (!item.attachment_url) return;
     try {
       const url = announcementsAPI.getAttachmentUrl(item.attachment_url);
       await Linking.openURL(url);
     } catch {
-      Alert.alert('Error', 'Failed to open attachment');
+      Alert.alert('Viewer Error', 'Unable to open the attached document.');
     }
   };
 
+  // Derivative: Check for moderator credentials
   const isAdmin = user?.role === 'admin';
 
+  /**
+   * renderItem:
+   * Visual logic for a single announcement card.
+   */
   const renderItem = ({ item }: { item: Announcement }) => {
     const pConfig = PRIORITY_CONFIG[item.priority] || PRIORITY_CONFIG['normal'];
     return (
       <Surface style={styles.card} elevation={1}>
         <View style={styles.row}>
+          {/* Visual categorization token */}
           <View style={[styles.iconBox, { backgroundColor: pConfig.bg, }]}>
             <MaterialCommunityIcons name={pConfig.icon as any} size={22} color={pConfig.color} />
           </View>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {/* Importance indicators */}
               {item.pinned && <MaterialCommunityIcons name="pin" size={14} color="#FFB74D" />}
-              <Text variant="titleSmall" style={{ color: '#ffffffff', flex: 1, fontSize: 16, paddingVertical: 6 }}>{item.title}</Text>
+              <Text variant="titleSmall" style={{ color: '#ffffff', flex: 1, fontSize: 16, paddingVertical: 6 }}>{item.title}</Text>
               {item.priority !== 'normal' && (
                 <View style={[styles.priorityBadge, { backgroundColor: pConfig.bg }]}>
                   <Text style={{ color: pConfig.color, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>
@@ -138,13 +203,14 @@ export default function AnnouncementsScreen() {
               )}
             </View>
             <Text variant="bodySmall" style={{ color: '#C4C4D4', marginTop: 4 }}>{item.body}</Text>
+            {/* Meta feedback: Attribution & Recency */}
             <Text variant="bodySmall" style={{ color: '#555', marginTop: 6, fontSize: 11 }}>
               {item.creator_name} • {new Date(item.created_at).toLocaleDateString()}
             </Text>
           </View>
         </View>
 
-        {/* Attachment section */}
+        {/* ── Optional Attachment Component ── */}
         {item.attachment_url && (
           <TouchableRipple onPress={() => openAttachment(item)} borderless style={styles.attachmentRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -154,6 +220,7 @@ export default function AnnouncementsScreen() {
                   size={20} color="#7C4DFF"
                 />
               </View>
+              {/* Quick thumb preview if media is an image */}
               {item.attachment_type === 'image' && (
                 <Image
                   source={{ uri: announcementsAPI.getAttachmentUrl(item.attachment_url) }}
@@ -162,13 +229,14 @@ export default function AnnouncementsScreen() {
                 />
               )}
               <Text variant="bodySmall" style={{ color: '#7C4DFF', flex: 1 }}>
-                {item.attachment_type === 'image' ? 'View Image' : 'Open PDF'}
+                {item.attachment_type === 'image' ? 'Inspect Image' : 'Download Document (PDF)'}
               </Text>
               <MaterialCommunityIcons name="open-in-new" size={16} color="#888" />
             </View>
           </TouchableRipple>
         )}
 
+        {/* ── Administrative Controls ── */}
         {isAdmin && (
           <View style={styles.actions}>
             <TouchableRipple onPress={() => handleTogglePin(item.id)} borderless style={styles.actionBtn}>
@@ -186,6 +254,7 @@ export default function AnnouncementsScreen() {
     );
   };
 
+  // Loading state gate (only for initial fetch)
   if (loading && announcements.length === 0) return <LoadingScreen />;
 
   return (
@@ -195,23 +264,27 @@ export default function AnnouncementsScreen() {
         renderItem={renderItem}
         keyExtractor={item => item.id}
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        // Pulse logic for background sync
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7C4DFF" />}
-        ListEmptyComponent={<EmptyState icon="bullhorn" title="No announcements" subtitle="Nothing posted yet" />}
+        ListEmptyComponent={<EmptyState icon="bullhorn" title="Quiet Bulletin Board" subtitle="Check back later for community updates." />}
       />
 
-      {isAdmin && <FAB icon="plus" style={styles.fab} color="#FFF" onPress={openCreate} />}
+      {/* Primary Action Button (Moderators Only) */}
+      {isAdmin && <FAB icon="plus" style={styles.fab} color="#FFF" onPress={openCreate} label="Broadcast" />}
 
+      {/* ── Announcement Composer (Modal) ── */}
       <Portal>
         <Modal visible={showModal} onDismiss={() => setShowModal(false)} contentContainerStyle={styles.modal}>
           <Text variant="titleLarge" style={{ color: '#E8E8F0', fontWeight: '700', marginBottom: 16 }}>
-            {isEditing ? 'Edit Announcement' : 'New Announcement'}
+            {isEditing ? 'Revise Notice' : 'New Broadcast'}
           </Text>
-          <TextInput label="Title *" value={title} onChangeText={setTitle} mode="outlined" style={styles.input}
+          <TextInput label="Heading / Catch-line *" value={title} onChangeText={setTitle} mode="outlined" style={styles.input}
             outlineColor="#3D3D5C" activeOutlineColor="#7C4DFF" textColor="#E8E8F0" />
-          <TextInput label="Body *" value={body} onChangeText={setBody} mode="outlined" multiline numberOfLines={4}
+          <TextInput label="Main Message Content *" value={body} onChangeText={setBody} mode="outlined" multiline numberOfLines={4}
             style={styles.input} outlineColor="#3D3D5C" activeOutlineColor="#7C4DFF" textColor="#E8E8F0" />
 
-          <Text variant="bodySmall" style={{ color: '#888', marginBottom: 6 }}>Priority</Text>
+          {/* Priority selector */}
+          <Text variant="bodySmall" style={{ color: '#888', marginBottom: 6 }}>Broadcast Urgency</Text>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
             {(['normal', 'important', 'urgent'] as AnnouncementPriority[]).map(p => (
               <Button key={p} mode={priority === p ? 'contained' : 'outlined'} compact
@@ -224,10 +297,10 @@ export default function AnnouncementsScreen() {
             ))}
           </View>
 
-          {/* Attachment picker (create mode only) */}
+          {/* Attachment handling (Restricted to creation to ensure server consistency) */}
           {!isEditing && (
             <View style={{ marginBottom: 16 }}>
-              <Text variant="bodySmall" style={{ color: '#888', marginBottom: 6 }}>Attachment (optional)</Text>
+              <Text variant="bodySmall" style={{ color: '#888', marginBottom: 6 }}>Supplementary File (Optional)</Text>
               {attachmentUri ? (
                 <View style={styles.attachmentPreview}>
                   <MaterialCommunityIcons name="paperclip" size={18} color="#7C4DFF" />
@@ -241,7 +314,7 @@ export default function AnnouncementsScreen() {
               ) : (
                 <Button mode="outlined" icon="paperclip" compact onPress={pickAttachment}
                   textColor="#888" style={{ borderColor: '#3D3D5C', borderRadius: 12 }}>
-                  Attach Image or PDF
+                  Link Photo or PDF
                 </Button>
               )}
             </View>
@@ -249,7 +322,7 @@ export default function AnnouncementsScreen() {
 
           <Button mode="contained" onPress={handleSave} loading={saving} disabled={saving}
             buttonColor="#7C4DFF" style={{ borderRadius: 12 }} icon="send">
-            {isEditing ? 'Update' : 'Post'}
+            {isEditing ? 'Update Broadcast' : 'Publish to Board'}
           </Button>
         </Modal>
       </Portal>
@@ -257,6 +330,7 @@ export default function AnnouncementsScreen() {
   );
 }
 
+// ── Shared UI Tokens ──
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F0F1A' },
   card: { backgroundColor: '#1A1A2E', borderRadius: 16, padding: 16, marginBottom: 8 },

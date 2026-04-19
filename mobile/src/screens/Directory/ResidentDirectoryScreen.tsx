@@ -1,52 +1,94 @@
+// Import React and hooks for managing lists and administrative modal states
 import React, { useState, useCallback } from 'react';
+// Import layout and native device integration (Linking) components
 import { View, FlatList, StyleSheet, RefreshControl, Linking, Alert } from 'react-native';
+// Import themed MD3 components from React Native Paper for a consistent design
 import { Text, Surface, Searchbar, Avatar, TouchableRipple, Button, Portal, Modal, TextInput, Menu, IconButton } from 'react-native-paper';
+// Import community icons for visual distinction
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+// Import domain-specific APIs for resident data and hierarchy management
 import { residentsAPI } from '../../services/api';
+// Import shared TypeScript definitions for data integrity
 import { ResidentInfo, ResidentStats } from '../../types';
+// Import common UI components for state feedback
 import { EmptyState, LoadingScreen, StatCard } from '../../components/Common';
+// Import global auth store to verify current user's administrative privileges
 import { useAuthStore } from '../../store';
+// Import navigation-specific hook to trigger refreshes when the screen gains focus
 import { useFocusEffect } from '@react-navigation/native';
 
+/**
+ * ResidentDirectoryScreen:
+ * A searchable and manageable phonebook of all neighbors within the society.
+ * Includes governance tools for admins to assign committee roles.
+ */
 export default function ResidentDirectoryScreen() {
+  // Extract user context to gate administrative menus
   const { user } = useAuthStore();
+  
+  // ── Core Data State ──
   const [residents, setResidents] = useState<ResidentInfo[]>([]);
   const [stats, setStats] = useState<ResidentStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  // Committee Management State
-  const [menuVisible, setMenuVisible] = useState<string | null>(null);
-  const [editResident, setEditResident] = useState<ResidentInfo | null>(null);
-  const [committeeRole, setCommitteeRole] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [saving, setSaving] = useState(false);
+  // ── Committee Management (Admin Only) State ──
+  const [menuVisible, setMenuVisible] = useState<string | null>(null); // Controls which row's context menu is open
+  const [editResident, setEditResident] = useState<ResidentInfo | null>(null); // The user being promoted/updated
+  const [committeeRole, setCommitteeRole] = useState(''); // Text input for the specific role title
+  const [showModal, setShowModal] = useState(false); // Controls the Role Edit modal visibility
+  const [saving, setSaving] = useState(false); // UI feedback for network persistence
 
+  // Refresh data whenever the navigation focuses back on this screen
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
+  /**
+   * loadData:
+   * Aggregates the full list of residents and high-level occupancy statistics.
+   */
   const loadData = async () => {
     try {
       const [resList, statsData] = await Promise.all([residentsAPI.list(), residentsAPI.stats()]);
       setResidents(resList);
       setStats(statsData);
-    } catch { } finally { setLoading(false); }
+    } catch { 
+      // Errors handled by global interceptors or ignored for silent failures
+    } finally { 
+      setLoading(false); 
+    }
   };
 
+  /**
+   * onRefresh:
+   * Standard pull-to-refresh handler.
+   */
   const onRefresh = async () => { setRefreshing(true); await loadData(); setRefreshing(false); };
 
+  /**
+   * handleSetCommittee:
+   * Commits a committee role assignment to the backend.
+   */
   const handleSetCommittee = async () => {
     if (!editResident) return;
     setSaving(true);
     try {
       await residentsAPI.setCommittee(editResident.id, true, committeeRole);
+      // Optimistically update the local list to reflect the new hierarchy
       setResidents(prev => prev.map(r => r.id === editResident.id ? { ...r, is_committee: true, committee_role: committeeRole } : r));
       setShowModal(false);
       Alert.alert('Success', 'Committee member updated');
-    } catch { Alert.alert('Error', 'Failed to update role'); }
-    finally { setSaving(false); }
+    } catch { 
+      Alert.alert('Error', 'Failed to update role'); 
+    } finally { 
+      setSaving(false); 
+    }
   };
 
+  /**
+   * handleRemoveCommittee:
+   * Strips a user of their committee role.
+   */
   const handleRemoveCommittee = async (id: string) => {
     Alert.alert('Remove from Committee', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
@@ -56,13 +98,20 @@ export default function ResidentDirectoryScreen() {
         onPress: async () => {
           try {
             await residentsAPI.setCommittee(id, false, '');
+            // Update local state to demote the user
             setResidents(prev => prev.map(r => r.id === id ? { ...r, is_committee: false, committee_role: undefined } : r));
-          } catch { Alert.alert('Error', 'Failed to remove'); }
+          } catch { 
+            Alert.alert('Error', 'Failed to remove'); 
+          }
         }
       }
     ]);
   };
 
+  /**
+   * openEditModal:
+   * Pre-fills and launches the role assignment interface.
+   */
   const openEditModal = (resident: ResidentInfo) => {
     setEditResident(resident);
     setCommitteeRole(resident.committee_role || '');
@@ -70,28 +119,44 @@ export default function ResidentDirectoryScreen() {
     setMenuVisible(null);
   };
 
+  /**
+   * Filter Logic:
+   * Supports searching by Name, Flat Number, or Block.
+   */
   const filtered = residents.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
     (r.flat_number || '').toLowerCase().includes(search.toLowerCase()) ||
     (r.block || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  // Divide the list into governance and standard residents
   const committeeList = filtered.filter(r => r.is_committee);
   const otherResidents = filtered.filter(r => !r.is_committee);
 
+  /**
+   * callResident:
+   * Initiates a native phone call via the device's dialer.
+   */
   const callResident = (phone: string) => Linking.openURL(`tel:${phone}`);
 
-  const renderItem = ({ item }: { item: ResidentInfo }) => { // Standard list item
+  /**
+   * renderItem:
+   * Renders a single resident entry with visual cues for role and authority.
+   */
+  const renderItem = ({ item }: { item: ResidentInfo }) => {
     const initials = item.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     const isAdmin = user?.role === 'admin';
 
     return (
       <Surface style={styles.card} elevation={1}>
         <View style={styles.row}>
+          {/* Circular avatar with role-colored background */}
           <Avatar.Text size={44} label={initials} style={{ backgroundColor: item.role === 'admin' ? '#311B92' : (item.is_committee ? '#FF6F00' : '#252542') }} color="#E8E8F0" />
+          
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text variant="titleSmall" style={{ color: '#E8E8F0' }}>{item.name}</Text>
+              {/* Visual badges for quick categorization */}
               {item.role === 'admin' && (
                 <View style={styles.badge}><Text style={[styles.badgeText, { color: '#FFB74D' }]}>ADMIN</Text></View>
               )}
@@ -104,11 +169,13 @@ export default function ResidentDirectoryScreen() {
             </Text>
           </View>
 
+          {/* Action Row for the specific resident */}
           <View style={{ flexDirection: 'row' }}>
             {item.phone && (
               <IconButton icon="phone" iconColor="#4CAF50" size={20} onPress={() => callResident(item.phone!)} />
             )}
 
+            {/* Admin-only context menu for management actions */}
             {isAdmin && (
               <Menu
                 visible={menuVisible === item.id}
@@ -128,6 +195,10 @@ export default function ResidentDirectoryScreen() {
     );
   };
 
+  /**
+   * renderSectionHeader:
+   * Visual divider for distinguishing the hierarchy.
+   */
   const renderSectionHeader = (title: string, count: number) => (
     <View style={{ paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <Text variant="titleMedium" style={{ color: '#7C4DFF', fontWeight: '700' }}>{title}</Text>
@@ -137,11 +208,12 @@ export default function ResidentDirectoryScreen() {
     </View>
   );
 
+  // Loading state gate
   if (loading) return <LoadingScreen />;
 
   return (
     <View style={styles.container}>
-      {/* Stats row */}
+      {/* ── Top Level Stats ── */}
       {stats && (
         <View style={styles.statsRow}>
           <StatCard icon="account-group" label="Residents" value={stats.total_residents} color="#7C4DFF" />
@@ -150,6 +222,7 @@ export default function ResidentDirectoryScreen() {
         </View>
       )}
 
+      {/* ── Search Input ── */}
       <Searchbar
         placeholder="Search..."
         value={search} onChangeText={setSearch}
@@ -157,13 +230,15 @@ export default function ResidentDirectoryScreen() {
         iconColor="#888" placeholderTextColor="#666"
       />
 
+      {/* ── Main List ── */}
       <FlatList
-        data={search ? filtered : otherResidents}
+        data={search ? filtered : otherResidents} // If searching, show a flattened list; else show hierarchical sections
         renderItem={({ item }) => renderItem({ item })}
         keyExtractor={item => item.id}
         contentContainerStyle={{ padding: 16, paddingTop: 0, paddingBottom: 100 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#7C4DFF']} tintColor="#7C4DFF" />}
         ListHeaderComponent={
+          // Hierarchical rendering only when not actively searching to avoid layout confusion
           !search && committeeList.length > 0 ? (
             <View>
               {renderSectionHeader("Committee Members", committeeList.length)}
@@ -175,7 +250,7 @@ export default function ResidentDirectoryScreen() {
         ListEmptyComponent={<EmptyState icon="account-search" title="No residents found" subtitle="Try a different search" />}
       />
 
-      {/* Edit Committee Role Modal */}
+      {/* ── Administrative Promotion Modal ── */}
       <Portal>
         <Modal visible={showModal} onDismiss={() => setShowModal(false)} contentContainerStyle={styles.modal}>
           <Text variant="titleLarge" style={{ color: '#E8E8F0', fontWeight: '700', marginBottom: 16 }}>
@@ -204,14 +279,17 @@ export default function ResidentDirectoryScreen() {
   );
 }
 
+// ── Local UI Architecture ──
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F0F1A' },
   statsRow: { flexDirection: 'row', paddingHorizontal: 12, paddingTop: 8 },
   searchbar: { backgroundColor: '#1A1A2E', marginHorizontal: 16, marginVertical: 8, borderRadius: 12 },
   card: { backgroundColor: '#1A1A2E', borderRadius: 16, padding: 14, marginBottom: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  // Styled badges for highlighting governance status
   badge: { backgroundColor: '#2E2A0E', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
   badgeText: { fontSize: 9, fontWeight: '700' },
+  // Modal container for overlays
   modal: { backgroundColor: '#1A1A2E', margin: 20, padding: 24, borderRadius: 20 },
   input: { marginBottom: 20, backgroundColor: '#1A1A2E' },
 });

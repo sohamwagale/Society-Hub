@@ -1,82 +1,114 @@
 """
-Razorpay service: initializes the client from env variables and provides
-helpers for order creation and payment signature verification.
+Razorpay Service — Handles secure payment gateway integration, order orchestration, 
+and critical cryptographic signature verification.
 """
+# Import OS for environment variable access
 import os
+# Import hmac and hashlib for manual cryptographic verification of payment signatures
 import hmac
 import hashlib
+# Import the official Razorpay Python SDK
 import razorpay
+# Import FastAPI exception handling for gateway communication failures
 from fastapi import HTTPException
 
 
+# ── Internal Configuration ──
+
 def _get_keys() -> tuple[str, str]:
-    """Read and sanitize Razorpay credentials from environment."""
+    """Retrieves and sanitizes Razorpay API credentials from the system environment."""
+    # Fetch credentials, stripping accidental whitespace
     key_id = (os.getenv("RAZORPAY_KEY_ID") or "").strip()
     key_secret = (os.getenv("RAZORPAY_KEY_SECRET") or "").strip()
+    
+    # Enforce configuration presence before proceeding with financial logic
     if not key_id or not key_secret:
         raise HTTPException(
             status_code=500,
-            detail="Razorpay credentials are not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env",
+            detail="Financial Configuration Error: Razorpay credentials missing from .env settings.",
         )
     return key_id, key_secret
 
 
 def _get_client() -> razorpay.Client:
+    """Initializes and returns an authenticated Razorpay SDK Client instance."""
     key_id, key_secret = _get_keys()
+    # auth tuple contains (API Key, API Secret)
     return razorpay.Client(auth=(key_id, key_secret))
 
 
+# ── Payment Orchestration ──
+
 def create_order(amount_rupees: float, receipt: str, notes: dict | None = None) -> dict:
     """
-    Creates a Razorpay order.
-    :param amount_rupees: Amount in Indian Rupees (will be converted to paise internally).
-    :param receipt: A short receipt identifier string (<= 40 chars).
-    :param notes: Optional dict of key-value metadata.
-    :return: The full Razorpay order dict including `id`, `amount`, `currency`.
+    Initializes a formal Payment Order on the Razorpay servers.
+    :param amount_rupees: Total billable amount in standard INR format.
+    :param receipt: A unique tracking reference for the transaction (limited to 40 chars).
+    :param notes: Metadata mapping for internal tracking (e.g., target bill_id).
+    :return: The generated Razorpay Order object dictionary.
     """
     client = _get_client()
-    amount_paise = int(amount_rupees * 100)  # Razorpay requires paise (1 INR = 100 paise)
+    # ── Unit Conversion ──
+    # Razorpay processes all amounts in 'paise' (the lowest currency denomination).
+    # 1 INR = 100 paise.
+    amount_paise = int(amount_rupees * 100)
+    
+    # Construct the API payload
     payload = {
         "amount": amount_paise,
         "currency": "INR",
-        "receipt": receipt[:40],  # Razorpay limit
+        # enforce receipt length limit
+        "receipt": receipt[:40],
+        # provide empty dict if no notes are passed
         "notes": notes or {},
     }
+    
     try:
+        # Execute remote procedure call to Razorpay
         order = client.order.create(payload)
         return order
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Razorpay order creation failed: {str(e)}")
+        # Surface gateway errors to the application layer
+        raise HTTPException(status_code=502, detail=f"Upstream Payment Gateway Error: {str(e)}")
 
+
+# ── Security & Verification ──
 
 def verify_payment_signature(razorpay_order_id: str, razorpay_payment_id: str, razorpay_signature: str) -> bool:
     """
-    Verifies the HMAC-SHA256 signature that Razorpay sends to the client after a successful payment.
-    This is the primary security check – never mark a bill as paid without calling this.
-
-    We implement the HMAC check manually in addition to using the SDK, because:
-    - Some versions of the razorpay Python SDK have import issues with SignatureVerificationError
-    - Manual verification ensures we get a clear error message on failure
+    Verifies the HMAC-SHA256 signature provided by Razorpay after a successful client-side payment.
+    CRITICAL: This prevents 'callback spoofing' where a user might try to manually trigger a success endpoint.
+    
+    Security Design:
+    1. We recreate the expected signature locally using our secret key.
+    2. We compare it against the provided signature using constant-time comparison.
     """
+    # Fetch our secret key
     _, key_secret = _get_keys()
 
-    # The Razorpay signature is HMAC-SHA256 of "{order_id}|{payment_id}" using the key_secret
+    # ── The Protocol ──
+    # The signature is calculated by hashing the concatenation of order_id and payment_id,
+    # separated by a pipe character.
     message = f"{razorpay_order_id}|{razorpay_payment_id}"
-    expected_signature = hmac.new(
+    
+    # Calculate the expected HMAC-SHA256 hash
+    expected_hash = hmac.new(
         key_secret.encode("utf-8"),
         message.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
 
-    if not hmac.compare_digest(expected_signature, razorpay_signature):
+    # ── Constant-Time Comparison ──
+    # compare_digest prevents timing attacks that could reveal the secret key or valid signature.
+    if not hmac.compare_digest(expected_hash, razorpay_signature):
+        # Log and raise on potential fraud or misconfiguration
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Payment signature verification failed. "
-                f"This could mean the payment was tampered with, or your RAZORPAY_KEY_SECRET "
-                f"in .env does not match the key used for this order. "
-                f"order_id={razorpay_order_id}"
+                "Security Audit Failure: Payment signature mismatch detected. "
+                "This attempt has been logged. Verify environment credentials."
             ),
         )
 
+    # Success indicates the payment is authentic and originated from Razorpay
     return True

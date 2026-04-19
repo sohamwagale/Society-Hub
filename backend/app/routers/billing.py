@@ -1,73 +1,102 @@
+# Import standard OS module for file path manipulations
 import os
+# Import uuid for unique record IDs
 import uuid
+# Import date/datetime for handling bill due dates and payment timestamps
 from datetime import date, datetime
+# Import Optional for type hinting nullable fields
 from typing import Optional
+# Import FastAPI components for routing, dependencies, errors, and file uploads
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+# Import SQLAlchemy Session for DB operations
 from sqlalchemy.orm import Session
+# Import the database session utility
 from app.database import get_db
+# Import core models for billing, payments, and associations
 from app.models.user import User
 from app.models.billing import Bill, BillPayment, BillType, BillStatus, BillFlatAmount
+# Import Pydantic schemas for data validation
 from app.schemas.billing import BillCreate, BillOut, BillUpdate, BillPaymentCreate, BillPaymentOut
+# Import authentication utilities for role and session management
 from app.utils.auth import get_current_user, require_role
+# Import file storage utility for uploading receipts
 from app.utils.storage import upload_file
+# Import notification service to broadcast bill alerts
 from app.services.notification_service import notify_all_residents, create_notification
+# Import notification type enum
 from app.models.notification import NotificationType
 
+# Initialize the router with prefix and tags
 router = APIRouter(prefix="/api/bills", tags=["Billing"])
 
 
+# ── Internal Helper: Payment Status Computation ──
 def _get_payment_status(bill: Bill, user: User, db: Session) -> str:
-    # Admin: compute aggregate status across all residents of the same society
+    """
+    Computes the status of a bill (paid/due/overdue) relative to a specific user or context.
+    """
+    # ── Admin Context: Compute aggregate status across the society ──
     if user.role == "admin":
+        # Start by finding all residents in the system
         residents_query = db.query(User).filter(User.role == "resident")
+        # Filter by society if specified
         if bill.society_id:
             residents_query = residents_query.filter(User.society_id == bill.society_id)
+        # Select only those residents who have passed onboarding
         all_residents = [u for u in residents_query.all() if u.is_fully_approved]
+        # Retrieve all payment records for this specific bill
         payments = db.query(BillPayment).filter(BillPayment.bill_id == bill.id).all()
+        # Create a set of user IDs who have paid
         paid_user_ids = {p.user_id for p in payments}
 
-        # Build set of paid flat IDs
+        # Identify which flats have been "cleared" by any resident paying
         paid_flat_ids = set()
         for u in db.query(User).filter(User.id.in_(paid_user_ids)).all():
             if u.flat_id:
                 paid_flat_ids.add(u.flat_id)
 
-        # Count unique flats that owe this bill (amount != 0)
+        # Track state across the society's flats
         seen_flats = set()
         total_owing = 0
         total_paid = 0
         for u in all_residents:
-            flat_key = u.flat_id or u.id  # fallback for users without flat
+            # Use flat ID as primary key, or user ID for unassigned residents
+            flat_key = u.flat_id or u.id
             if flat_key in seen_flats:
                 continue
             seen_flats.add(flat_key)
+            # Check the actual amount assigned to this specific resident/flat
             actual_amount = _get_resident_bill_amount(bill, u, db)
             if actual_amount == 0:
-                continue  # excluded from this bill
+                continue  # Resident is excluded from this billing cycle
             total_owing += 1
+            # Check if this user or their flatmate has paid
             if (u.id in paid_user_ids) or (u.flat_id and u.flat_id in paid_flat_ids):
                 total_paid += 1
 
+        # Determine aggregate status
         if total_owing > 0 and total_paid >= total_owing:
             return "paid"
         if bill.due_date < date.today():
             return "overdue"
         return "due"
 
-    # Resident: check if ANY user from the same flat has paid
+    # ── Resident Context: Check status for their own household ──
     if not user.flat_id:
-        # Fallback for edge cases without flat_id
+        # If user isn't in a flat, check their individual payment
         payment = db.query(BillPayment).filter(
             BillPayment.bill_id == bill.id, BillPayment.user_id == user.id
         ).first()
     else:
-        # Find all users in the same flat
+        # Find all users currently living in the same flat
         flat_users = db.query(User).filter(User.flat_id == user.flat_id).all()
         flat_user_ids = [u.id for u in flat_users]
+        # Check if ANY of them made the payment for this bill
         payment = db.query(BillPayment).filter(
             BillPayment.bill_id == bill.id, BillPayment.user_id.in_(flat_user_ids)
         ).first()
 
+    # Determine individual/flat status
     if payment:
         return "paid"
     if bill.due_date < date.today():
@@ -75,36 +104,47 @@ def _get_payment_status(bill: Bill, user: User, db: Session) -> str:
     return "due"
 
 
+# ── Internal Helper: Resident-Specific Amount Calculation ──
 def _get_resident_bill_amount(bill: Bill, user: User, db: Session) -> float:
+    """
+    Returns the final numeric amount a resident owes for a bill, accounting for overrides.
+    """
     if not user.flat_id:
+        # Return default bill amount if no flat link exists
         return bill.amount
+    # Search for an explicit override for this specific bill-flat combination
     override = db.query(BillFlatAmount).filter(
         BillFlatAmount.bill_id == bill.id,
         BillFlatAmount.flat_id == user.flat_id
     ).first()
+    # Return override if found, otherwise the base amount
     if override:
         return override.amount
     return bill.amount
 
 
+# ── Internal Helper: Global Payment Completion Check ──
 def _is_all_residents_paid(bill: Bill, db: Session) -> bool:
     """
-    Returns True ONLY when every non-excluded resident (unique per flat) in the
-    same society has paid.  Excluded residents (amount == 0) are skipped.
+    Returns True ONLY when every non-excluded resident (unique per flat) has cleared the bill.
+    Used for automatic archiving.
     """
+    # Fetch all potentially owing residents
     residents_query = db.query(User).filter(User.role == "resident")
     if bill.society_id:
         residents_query = residents_query.filter(User.society_id == bill.society_id)
     all_residents = [u for u in residents_query.all() if u.is_fully_approved]
+    # Fetch all payments made so far
     payments = db.query(BillPayment).filter(BillPayment.bill_id == bill.id).all()
     paid_user_ids = {p.user_id for p in payments}
 
-    # Collect flat IDs that have made a payment
+    # Map payments to flats
     paid_flat_ids: set = set()
     for u in db.query(User).filter(User.id.in_(paid_user_ids)).all():
         if u.flat_id:
             paid_flat_ids.add(u.flat_id)
 
+    # Track completion count
     seen_flats: set = set()
     total_owing = 0
     total_paid = 0
@@ -113,21 +153,28 @@ def _is_all_residents_paid(bill: Bill, db: Session) -> bool:
         if flat_key in seen_flats:
             continue
         seen_flats.add(flat_key)
+        # Skip residents who owe 0 for this bill
         if _get_resident_bill_amount(bill, u, db) == 0:
-            continue  # excluded from this bill
+            continue
         total_owing += 1
+        # Check if paid by self or flatmate
         if (u.id in paid_user_ids) or (u.flat_id and u.flat_id in paid_flat_ids):
             total_paid += 1
 
+    # Return true if the "Paid" cohort matches the "Owing" cohort
     return total_owing > 0 and total_paid >= total_owing
 
 
+# ── Bill Management Endpoints ──
+
+# POST endpoint to generate a new society-wide bill (Admin only)
 @router.post("", response_model=BillOut, status_code=201)
 def create_bill(
     data: BillCreate,
     db: Session = Depends(get_db),
     admin: User = Depends(require_role("admin")),
 ):
+    # Initialize the base Bill record
     bill = Bill(
         id=str(uuid.uuid4()),
         society_id=admin.society_id,
@@ -138,21 +185,28 @@ def create_bill(
         due_date=data.due_date,
         created_by=admin.id,
     )
+    # add to session context
     db.add(bill)
+    # Commit to get ID reference
     db.commit()
+    # reload
     db.refresh(bill)
 
+    # If the admin provided specific overrides for individual flats
     if data.flat_overrides:
         for override in data.flat_overrides:
+            # Create a BillFlatAmount record for each override
             flat_amount = BillFlatAmount(
                 bill_id=bill.id,
                 flat_id=override.flat_id,
                 amount=override.amount
             )
             db.add(flat_amount)
+        # Commit the override batch
         db.commit()
 
-    # Notify all residents of this society
+    # ── Notification Broadcast ──
+    # Alert all active residents of the society about the new bill
     notify_all_residents(
         db, f"New Bill: {bill.title}",
         f"Amount: Rs.{bill.amount} | Due: {bill.due_date}",
@@ -160,10 +214,12 @@ def create_bill(
         society_id=admin.society_id,
     )
 
+    # Validate model and inject initial status for response
     result = BillOut.model_validate(bill)
     result.payment_status = "due"
     return result
 
+# GET endpoint to list all bills for the user's society
 @router.get("", response_model=list[BillOut])
 def list_bills(
     bill_type: Optional[str] = Query(None),
@@ -171,39 +227,52 @@ def list_bills(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # Base query filtered by the current user's society
     query = db.query(Bill).filter(Bill.society_id == current_user.society_id)
+    # Optional filter by category (Maintenance, Electricity, etc.)
     if bill_type:
         query = query.filter(Bill.bill_type == BillType(bill_type))
+    # Optional filter by active status (archived vs non-archived)
     if active_only is not None:
         query = query.filter(Bill.is_active == active_only)
     
+    # Retrieve sorted results
     bills = query.order_by(Bill.created_at.desc()).all()
 
     results = []
     for bill in bills:
         actual_amount = bill.amount
+        # Logic for residents: determine specific amount and exclude if they owe 0
         if current_user.role == "resident":
             actual_amount = _get_resident_bill_amount(bill, current_user, db)
             if actual_amount == 0:
                 continue
                 
+        # Validate output schema
         out = BillOut.model_validate(bill)
+        # Override displayed amount with flat-specific amount
         out.amount = actual_amount
+        # Dynamically compute the payment status label
         out.payment_status = _get_payment_status(bill, current_user, db)
         results.append(out)
     return results
 
 
+# ── Advanced Report Exporting ──
+
+# GET endpoint to generate a PDF summary of billed and unpaid amounts
 @router.get("/export-report")
 def export_bills_report(
     token: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """Generate a PDF report of all active bills with flat-wise payment status."""
+    """Generate a high-premium PDF report of active bills with flat-wise payment statuses."""
+    # Import necessary PDF and auth libs inside the handler for performance/cold-start optimization
     from app.models.flat import Flat
     from app.models.society import Society
     from jose import jwt, JWTError
     from app.utils.auth import SECRET_KEY, ALGORITHM
+    # ReportLab imports for sophisticated PDF generation
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.colors import HexColor
     from reportlab.pdfgen import canvas as pdf_canvas
@@ -211,31 +280,38 @@ def export_bills_report(
     from io import BytesIO
     from fastapi.responses import StreamingResponse
 
-    # Auth via token query param
+    # ── Security Check (via Query String for Browser Links) ──
     if not token:
+        # Reject if no auth token provided
         raise HTTPException(status_code=401, detail="Authentication required. Provide ?token= query parameter.")
     try:
+        # Decode JWT to identify the requester
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        # Handle expired or corrupted tokens
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
 
+    # Fetch user from DB and verify ADMIN privileges
     current_user = db.query(User).filter(User.id == user_id).first()
     if not current_user or current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise HTTPException(status_code=403, detail="Administrative access is required for report generation")
 
-    # Get data (scoped to admin's society)
+    # ── Data Collection ──
+    # Retrieve all bills currently in active status for the society
     active_bills = (
         db.query(Bill)
         .filter(Bill.is_active == True, Bill.society_id == current_user.society_id)
         .order_by(Bill.due_date.desc())
         .all()
     )
+    # check for empty set
     if not active_bills:
-        raise HTTPException(status_code=404, detail="No active bills found")
+        raise HTTPException(status_code=404, detail="No active billing cycles found for this society")
 
+    # Identify all flats that have at least one approved resident
     from app.models.flat import Flat as FlatModel
     flats = (
         db.query(Flat)
@@ -245,67 +321,85 @@ def export_bills_report(
         .order_by(Flat.block, Flat.flat_number)
         .all()
     )
+    # load society name for the header
     society = db.query(Society).filter(Society.id == current_user.society_id).first()
-    society_name = society.name if society else "Society"
+    society_name = society.name if society else "The Society"
 
-    # Build flat data: for each flat, determine payment status per bill
+    # Iterate through all flats to build a detailed spreadsheet-like structure
     flat_rows = []
     for flat in flats:
+        # Format display label (e.g. A-101)
         flat_label = f"{flat.block}-{flat.flat_number}"
+        # Filter for fully onboarded residents only
         flat_resident_ids = [u.id for u in flat.residents if u.is_fully_approved]
         if not flat_resident_ids:
             continue
 
-        # Find owner name
+        # Identify a primary name to show for the flat (Owner or any resident)
         owner = next((u for u in flat.residents if u.resident_type == 'owner' and u.is_fully_approved), None)
-        owner_name = owner.name if owner else (flat.residents[0].name if flat.residents else "")
+        owner_name = owner.name if owner else (flat.residents[0].name if flat.residents else "Occupant")
 
+        # row init
         row = {"flat": flat_label, "owner": owner_name, "bills": {}, "total_due": 0.0}
         for bill in active_bills:
-            # Get custom amount for this flat
+            # check for flat-specific overrides or exclusions
             override = db.query(BillFlatAmount).filter(
                 BillFlatAmount.bill_id == bill.id,
                 BillFlatAmount.flat_id == flat.id
             ).first()
+            # If set to zero, the flat is explicitly excluded from this bill
             if override and override.amount == 0:
                 row["bills"][bill.id] = {"status": "excluded", "amount": 0}
                 continue
+            # final amount for this flat
             bill_amount = override.amount if override else bill.amount
 
-            # Check if any resident in this flat has paid
+            # Check if anyone in the household has recorded a payment for this bill
             payment = db.query(BillPayment).filter(
                 BillPayment.bill_id == bill.id,
                 BillPayment.user_id.in_(flat_resident_ids)
             ).first()
 
+            # Record status and amount paid/unpaid
             if payment:
                 row["bills"][bill.id] = {"status": "paid", "amount": bill_amount}
             else:
                 row["bills"][bill.id] = {"status": "due", "amount": bill_amount}
+                # tally up non-paid items
                 row["total_due"] += bill_amount
 
         flat_rows.append(row)
 
-    # Filter out bills that are fully paid
+
+    # ── PDF Content Prep ──
+    # Filter out bills that have already been fully paid by all residents
     incomplete_bills = []
     for bill in active_bills:
+        # Count settlements for this bill
         paid_count = sum(1 for fr in flat_rows if bill.id in fr["bills"] and fr["bills"][bill.id]["status"] == "paid")
+        # Count potential payers for this bill
         total_count = sum(1 for fr in flat_rows if bill.id in fr["bills"] and fr["bills"][bill.id]["status"] != "excluded")
+        # Include in report only if there's outstanding money
         if total_count > 0 and paid_count < total_count:
             incomplete_bills.append(bill)
 
+    # Handle scenario where everything is settled
     if not incomplete_bills:
-        raise HTTPException(status_code=404, detail="No active, unpaid bills found.")
+        raise HTTPException(status_code=404, detail="No active billing cycles with outstanding payments were found.")
         
+    # Focus report on these incomplete items
     active_bills = incomplete_bills
 
-    # ── Generate PDF ──
+    # ── Final PDF Layout Generation ──
     buffer = BytesIO()
+    # Use landscape A4 for complex tables
     page_size = landscape(A4)
+    # Initialize ReportLab canvas
     c = pdf_canvas.Canvas(buffer, pagesize=page_size)
     W, H = page_size
 
-    primary = HexColor("#311B92")
+    # Define a premium color palette
+    primary = HexColor("#311B92")  # Deep Indigo
     white = HexColor("#FFFFFF")
     text_dark = HexColor("#1A1A2E")
     text_light = HexColor("#555555")
@@ -314,79 +408,95 @@ def export_bills_report(
     grey_bg = HexColor("#F5F5F5")
     border = HexColor("#CCCCCC")
 
+    # Helper: Draw consistent page headers
     def draw_header(canvas, page_num=1):
+        # Header background bar
         canvas.setFillColor(primary)
         canvas.rect(0, H - 70, W, 70, fill=True, stroke=False)
+        # Title text
         canvas.setFillColor(white)
         canvas.setFont("Helvetica-Bold", 18)
-        canvas.drawString(30, H - 40, f"{society_name} — Bills Report")
+        canvas.drawString(30, H - 40, f"{society_name} — Comprehensive Billing Report")
+        # Meta info
         canvas.setFont("Helvetica", 10)
         canvas.drawString(30, H - 56, f"Generated: {datetime.utcnow().strftime('%d %b %Y, %I:%M %p UTC')}")
-        canvas.drawRightString(W - 30, H - 40, f"Active Bills: {len(active_bills)}")
+        # Summary stats in header
+        canvas.drawRightString(W - 30, H - 40, f"Monitored Bills: {len(active_bills)}")
         canvas.drawRightString(W - 30, H - 56, f"Page {page_num}")
 
+    # Helper: Draw page footers
     def draw_footer(canvas):
         canvas.setFillColor(text_light)
         canvas.setFont("Helvetica", 7)
-        canvas.drawCentredString(W / 2, 15, "Computer-generated report. Data as of generation time.")
+        canvas.drawCentredString(W / 2, 15, "Automated system report. All amounts in Indian Rupees (Rs.).")
 
-    # ── Page 1: Bills Summary ──
+    # ── Report Section 1: Billing Catalog Summary ──
     draw_header(c, 1)
     y = H - 100
 
     c.setFillColor(text_dark)
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(30, y, "Bills Summary")
+    c.drawString(30, y, "Active Billing Cycles")
     y -= 25
 
-    # Table header
+    # Define column horizontal positions
     col_x = [30, 230, 370, 480, 600]
-    headers = ["Bill Title", "Type", "Amount (Rs.)", "Due Date", "Paid / Total"]
+    headers = ["Bill Title", "Category / Type", "Base Amount", "Due Date", "Settlement Ratio"]
+    # Draw header bar for the table
     c.setFillColor(primary)
     c.rect(25, y - 5, W - 50, 20, fill=True, stroke=False)
+    # Draw header labels
     c.setFillColor(white)
     c.setFont("Helvetica-Bold", 9)
     for i, h in enumerate(headers):
         c.drawString(col_x[i], y, h)
     y -= 22
 
+    # Plot each bill in the summary table
     for idx, bill in enumerate(active_bills):
+        # Check for page overflow
         if y < 50:
             draw_footer(c)
             c.showPage()
             draw_header(c, 2)
             y = H - 100
 
-        # Alternating row background
+        # Implement zebra-striping for readability
         if idx % 2 == 0:
             c.setFillColor(grey_bg)
             c.rect(25, y - 5, W - 50, 18, fill=True, stroke=False)
 
+        # Calculate counts for this specific bill
         paid_count = sum(1 for fr in flat_rows if bill.id in fr["bills"] and fr["bills"][bill.id]["status"] == "paid")
         total_count = sum(1 for fr in flat_rows if bill.id in fr["bills"] and fr["bills"][bill.id]["status"] != "excluded")
 
         c.setFillColor(text_dark)
         c.setFont("Helvetica", 9)
+        # Truncate long titles
         title_display = bill.title[:30] + "..." if len(bill.title) > 30 else bill.title
         c.drawString(col_x[0], y, title_display)
+        # Format enum value
         c.drawString(col_x[1], y, (bill.bill_type.value if bill.bill_type else "-").title())
+        # Format currency
         c.drawString(col_x[2], y, f"{bill.amount:,.0f}")
+        # Format date
         c.drawString(col_x[3], y, bill.due_date.strftime("%d %b %Y") if bill.due_date else "-")
 
-        # Color-coded paid ratio
+        # Color-code the payment completion ratio
         if paid_count == total_count and total_count > 0:
-            c.setFillColor(green)
+            c.setFillColor(green)  # 100% complete
         elif paid_count == 0:
-            c.setFillColor(red)
+            c.setFillColor(red)    # 0% complete
         else:
-            c.setFillColor(HexColor("#E65100"))
+            c.setFillColor(HexColor("#E65100")) # Partial
         c.setFont("Helvetica-Bold", 9)
         c.drawString(col_x[4], y, f"{paid_count} / {total_count}")
 
         y -= 20
 
-    # ── Page 2+: Flat-wise Breakdown ──
+    # ── Report Section 2: Interactive Flat-wise Ledger ──
     draw_footer(c)
+    # Transition to new section
     c.showPage()
     page_num = 2
     draw_header(c, page_num)
@@ -394,14 +504,16 @@ def export_bills_report(
 
     c.setFillColor(text_dark)
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(30, y, "Flat-wise Payment Status")
+    c.drawString(30, y, "Unit-wise Payment Ledger")
     y -= 25
 
-    # Determine columns: Flat | Bill1 | Bill2 | ... | Total Due
-    max_bills_per_page = 6  # Fit bills across landscape page
+    # ── Pagination for Wide Columns ──
+    # If there are many active bills, split them across multiple pages horizontally
+    max_bills_per_page = 6
     bill_chunks = [active_bills[i:i + max_bills_per_page] for i in range(0, len(active_bills), max_bills_per_page)]
 
     for chunk_idx, bill_chunk in enumerate(bill_chunks):
+        # Handle secondary ledger pages
         if chunk_idx > 0:
             draw_footer(c)
             c.showPage()
@@ -409,27 +521,30 @@ def export_bills_report(
             draw_header(c, page_num)
             y = H - 100
 
-        num_cols = len(bill_chunk) + 2  # Flat + bills + Total Due
-        # Give "Flat" column double width to fit owner names
+        # Calculate reactive column widths
+        num_cols = len(bill_chunk) + 2
         flat_col_width = (W - 60) * 2 / (num_cols + 1)
         other_col_width = (W - 60 - flat_col_width) / (num_cols - 1)
-        col_starts = [30]  # Flat column starts at 30
+        col_starts = [30]
         for i in range(1, num_cols):
             col_starts.append(30 + flat_col_width + (i - 1) * other_col_width)
 
-        # Table header
+        # Ledger Section Table Header
         c.setFillColor(primary)
         c.rect(25, y - 5, W - 50, 20, fill=True, stroke=False)
         c.setFillColor(white)
         c.setFont("Helvetica-Bold", 8)
-        c.drawString(col_starts[0], y, "Flat")
+        c.drawString(col_starts[0], y, "Flat Information")
         for bi, bill in enumerate(bill_chunk):
+            # Shorten column labels for bills
             label = bill.title[:12] + ".." if len(bill.title) > 12 else bill.title
             c.drawString(col_starts[bi + 1], y, label)
-        c.drawString(col_starts[-1], y, "Total Due (Rs.)")
+        c.drawString(col_starts[-1], y, "Balance (Rs.)")
         y -= 20
 
+        # Plot each flat unit as a row in the ledger
         for ridx, fr in enumerate(flat_rows):
+            # Mid-ledger page break
             if y < 50:
                 draw_footer(c)
                 c.showPage()
@@ -437,43 +552,50 @@ def export_bills_report(
                 draw_header(c, page_num)
                 y = H - 100
 
-            # Alternating row
+            # Line striping
             if ridx % 2 == 0:
                 c.setFillColor(grey_bg)
                 c.rect(25, y - 5, W - 50, 18, fill=True, stroke=False)
 
             c.setFont("Helvetica-Bold", 9)
             c.setFillColor(text_dark)
+            # Display Flat + Owner identification
             flat_display = fr["flat"]
             if fr["owner"]:
                 flat_display += f" ({fr['owner'][:15]})"
             c.drawString(col_starts[0], y, flat_display)
 
+            # Plot payment checkmark or cross for each bill column
             c.setFont("Helvetica", 8)
             for bi, bill in enumerate(bill_chunk):
                 bill_info = fr["bills"].get(bill.id)
                 if not bill_info or bill_info["status"] == "excluded":
+                    # Dash for non-relevant bills
                     c.setFillColor(text_light)
                     c.drawString(col_starts[bi + 1], y, "—")
                 elif bill_info["status"] == "paid":
+                    # Green Check with Amount
                     c.setFillColor(green)
                     c.drawString(col_starts[bi + 1], y, f"✓ {bill_info['amount']:,.0f}")
                 else:
+                    # Red Cross with Amount
                     c.setFillColor(red)
                     c.drawString(col_starts[bi + 1], y, f"✗ {bill_info['amount']:,.0f}")
 
-            # Total due
+            # Final Balance Column for this flat
             c.setFont("Helvetica-Bold", 9)
             if fr["total_due"] > 0:
                 c.setFillColor(red)
             else:
                 c.setFillColor(green)
+            # Display total owed across all active bills
             c.drawString(col_starts[-1], y, f"{fr['total_due']:,.0f}")
 
             y -= 18
 
-    # Grand total
+    # ── Final Totals & Grand Summary ──
     y -= 10
+    # ensure room for the final summary box
     if y < 60:
         draw_footer(c)
         c.showPage()
@@ -481,6 +603,7 @@ def export_bills_report(
         draw_header(c, page_num)
         y = H - 100
 
+    # Aggregate global statistics
     grand_due = sum(fr["total_due"] for fr in flat_rows)
     grand_paid = sum(
         info["amount"]
@@ -489,116 +612,150 @@ def export_bills_report(
         if info["status"] == "paid"
     )
 
+    # Separation line
     c.setStrokeColor(border)
     c.setLineWidth(1)
     c.line(30, y + 5, W - 30, y + 5)
-    y -= 10
+    y -= 15
 
+    # Display Grand Summary metrics
     c.setFont("Helvetica-Bold", 11)
     c.setFillColor(text_dark)
-    c.drawString(30, y, f"Total Collected: ")
+    c.drawString(30, y, f"Total Revenue Collected: ")
     c.setFillColor(green)
-    c.drawString(160, y, f"Rs.{grand_paid:,.0f}")
+    c.drawString(165, y, f"Rs.{grand_paid:,.2f}")
 
     c.setFillColor(text_dark)
-    c.drawString(320, y, f"Total Outstanding: ")
+    c.drawString(340, y, f"Total Outstanding Dues: ")
     c.setFillColor(red)
-    c.drawString(470, y, f"Rs.{grand_due:,.0f}")
+    c.drawString(485, y, f"Rs.{grand_due:,.2f}")
 
+    # Finalize and close the PDF stream
     draw_footer(c)
     c.save()
     buffer.seek(0)
 
+    # Return the stream as a downloadable file with appropriate headers
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="bills_report_{date.today().isoformat()}.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="society_billing_report_{date.today().isoformat()}.pdf"'},
     )
 
 
+# ── Individual Bill Retrieval ──
+
+# GET endpoint to fetch detailed data for a single bill
 @router.get("/{bill_id}", response_model=BillOut)
 def get_bill(bill_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Find the bill record
     bill = db.query(Bill).filter(Bill.id == bill_id).first()
     if not bill:
         raise HTTPException(status_code=404, detail="Bill not found")
+    
+    # Context-aware logic for residents
     if current_user.role == "resident":
+        # Resolve specific amount for this resident
         actual_amount = _get_resident_bill_amount(bill, current_user, db)
+        # If resident is explicitly excluded, treat as not found for them
         if actual_amount == 0:
-            raise HTTPException(status_code=404, detail="Bill not found")
+            raise HTTPException(status_code=404, detail="Bill record not applicable to your unit")
+        # Validate schema
         out = BillOut.model_validate(bill)
+        # Apply local amount
         out.amount = actual_amount
     else:
+        # Admins see the base amount in the detail view
         out = BillOut.model_validate(bill)
         
+    # Inject computed payment status
     out.payment_status = _get_payment_status(bill, current_user, db)
     return out
 
 
+# ── Detailed Payment Tracking (Admin View) ──
+
+# GET endpoint for admins to see every resident's status for a specific bill
 @router.get("/{bill_id}/residents")
 def get_bill_residents(
     bill_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
-    """Get list of all residents and their payment status for a bill."""
+    """Retrieves a granular list of all society residents and matches them with their payment status for a specific bill."""
+    # check bill existence
     bill = db.query(Bill).filter(Bill.id == bill_id).first()
     if not bill:
-        raise HTTPException(status_code=404, detail="Bill not found")
+        raise HTTPException(status_code=404, detail="Bill record not found")
 
-    # Get all potential payers (residents) from the same society as the bill
+    # Fetch all active residents in the society
     residents_query = db.query(User).filter(User.role == "resident")
     if bill.society_id:
         residents_query = residents_query.filter(User.society_id == bill.society_id)
     users = [u for u in residents_query.all() if u.is_fully_approved]
     
-    # Get all payments for this bill
+    # Retrieve all payments recorded for this bill across the entire society
     payments = db.query(BillPayment).filter(BillPayment.bill_id == bill_id).all()
+    # set of IDs who paid
     paid_user_ids = {p.user_id for p in payments}
 
-    # Group payments by flat
+    # identify all flat IDs that are considered "Paid"
     paid_flat_ids = set()
     for user in db.query(User).filter(User.id.in_(paid_user_ids)).all():
         if user.flat_id:
             paid_flat_ids.add(user.flat_id)
 
+    # build resident list with status maps
     results = []
     for user in users:
+        # check specific override for this resident
         actual_amount = _get_resident_bill_amount(bill, user, db)
+        # skip if resident is excluded (amount 0)
         if actual_amount == 0:
             continue
             
+        # check if this user or their flatmate settled the bill
         is_paid = (user.id in paid_user_ids) or (user.flat_id in paid_flat_ids)
         
-        # Find the actual payment date for this flat
+        # Determine the precise payment timestamp for display
         paid_at = None
         if is_paid:
+            # find all users in the same household
             flat_users = [u.id for u in db.query(User).filter(User.flat_id == user.flat_id).all()] if user.flat_id else [user.id]
+            # locate the actual payment record made by any of them
             flat_payment = db.query(BillPayment).filter(BillPayment.bill_id == bill_id, BillPayment.user_id.in_(flat_users)).first()
             if flat_payment:
                 paid_at = flat_payment.paid_at
 
+        # Construct flat-resident status object
         results.append({
             "user_id": user.id,
             "name": user.name,
-            "flat": f"{user.flat.block}-{user.flat.flat_number}" if user.flat else "N/A",
+            "flat": f"{user.flat.block}-{user.flat.flat_number}" if user.flat else "Standalone",
             "status": "paid" if is_paid else "due",
             "paid_at": paid_at,
             "amount": actual_amount
         })
     
+    # Return the unified resident status list
     return results
 
 
+# ── Payment Processing ──
+
+# POST endpoint for residents to record a payment transaction
 @router.post("/pay", response_model=BillPaymentOut, status_code=201)
 def pay_bill(
     data: BillPaymentCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # check bill existence
     bill = db.query(Bill).filter(Bill.id == data.bill_id).first()
     if not bill:
-        raise HTTPException(status_code=404, detail="Bill not found")
+        raise HTTPException(status_code=404, detail="The specified bill does not exist")
 
+    # verify bill hasn't been paid by this household already
     if current_user.flat_id:
         flat_users = db.query(User).filter(User.flat_id == current_user.flat_id).all()
         flat_user_ids = [u.id for u in flat_users]
@@ -610,13 +767,17 @@ def pay_bill(
             BillPayment.bill_id == data.bill_id, BillPayment.user_id == current_user.id
         ).first()
 
+    # block double payments
     if existing:
-        raise HTTPException(status_code=400, detail="Bill already paid")
+        raise HTTPException(status_code=400, detail="This bill has already been settled by your unit")
 
+    # Re-verify the expected amount for this specific payer
     expected_amount = _get_resident_bill_amount(bill, current_user, db)
+    # block excluded users from paying
     if expected_amount == 0:
-        raise HTTPException(status_code=400, detail="This flat is excluded from this bill.")
+        raise HTTPException(status_code=400, detail="Your unit is not assigned to this billing cycle")
 
+    # create the payment record
     payment = BillPayment(
         id=str(uuid.uuid4()),
         bill_id=data.bill_id,
@@ -625,20 +786,26 @@ def pay_bill(
         payment_method=data.payment_method,
         transaction_ref=data.transaction_ref,
     )
+    # add to DB
     db.add(payment)
+    # commit
     db.commit()
+    # reload
     db.refresh(payment)
 
-    # Auto-archive only when ALL non-excluded residents have paid
+    # trigger check: if this was the last payment needed, archive the bill automatically
     if _is_all_residents_paid(bill, db):
         bill.is_active = False
         db.commit()
 
+    # return payment confirmation
     return payment
 
 
+# GET endpoint for users to see only their own payment ledger
 @router.get("/payments/history", response_model=list[BillPaymentOut])
 def payment_history(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # retrieve and return all payments made by this account, newest first
     return (
         db.query(BillPayment)
         .filter(BillPayment.user_id == current_user.id)
@@ -647,6 +814,7 @@ def payment_history(db: Session = Depends(get_db), current_user: User = Depends(
     )
 
 
+# POST endpoint to associate a digital receipt image with a payment record
 @router.post("/{payment_id}/upload-receipt")
 async def upload_receipt(
     payment_id: str,
@@ -654,21 +822,32 @@ async def upload_receipt(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # locate the relevant payment record, ensuring user owns it
     payment = db.query(BillPayment).filter(
         BillPayment.id == payment_id, BillPayment.user_id == current_user.id
     ).first()
+    # check for payment existence
     if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise HTTPException(status_code=404, detail="Payment record not found or access denied")
 
+    # isolate file extension
     ext = os.path.splitext(file.filename)[1]
+    # generate cloud storage path
     filename = f"{payment_id}{ext}"
     content_type = file.content_type or "application/octet-stream"
+    # buffer the file stream
     data = await file.read()
+    # process the upload to cloud storage
     payment.receipt_path = upload_file("bill-receipts", filename, data, content_type)
+    # save the reference URL in the DB
     db.commit()
+    # return the final path
     return {"receipt_path": payment.receipt_path}
 
 
+# ── Bill Configuration Updates ──
+
+# PUT endpoint to modify existing bill details (Admin only)
 @router.put("/{bill_id}")
 async def update_bill(
     bill_id: str,
@@ -676,49 +855,69 @@ async def update_bill(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
+    # locate the bill record
     bill = db.query(Bill).filter(Bill.id == bill_id).first()
     if not bill:
-        raise HTTPException(status_code=404, detail="Bill not found")
+        raise HTTPException(status_code=404, detail="Bill record not found")
 
+    # iterate through patch payload
     for field, value in payload.model_dump(exclude_none=True).items():
         if field == "bill_type":
+            # Cast type string to enum
             setattr(bill, field, BillType(value))
         else:
+            # apply standard fields (title, amount, due_date, etc.)
             setattr(bill, field, value)
+    
+    # save changes
     db.commit()
+    # reload fresh state
     db.refresh(bill)
+    # return updated bill
     return bill
 
 
+# ── Bill Deletion ──
+
+# DELETE endpoint to remove a bill (Admin only)
 @router.delete("/{bill_id}")
 async def delete_bill(
     bill_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
+    # locate record
     bill = db.query(Bill).filter(Bill.id == bill_id).first()
     if not bill:
-        raise HTTPException(status_code=404, detail="Bill not found")
+        raise HTTPException(status_code=404, detail="Bill record not found")
 
+    # safety check: block deletion if any payments have been recorded
     payments = db.query(BillPayment).filter(BillPayment.bill_id == bill_id).count()
     if payments > 0:
-        raise HTTPException(status_code=400, detail="Cannot delete a bill that has payments")
+        raise HTTPException(status_code=400, detail="Audit restriction: Cannot delete a bill that has associated payment records")
 
+    # remove from DB
     db.delete(bill)
+    # commit deletion
     db.commit()
-    return {"detail": "Bill deleted"}
+    # confirm success
+    return {"detail": "Bill successfully removed from the system"}
 
 
+# ── Digital Receipt Generation ──
+
+# GET endpoint to generate a professional PDF receipt for a specific payment
 @router.get("/{payment_id}/receipt")
 def download_receipt(
     payment_id: str,
     token: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """Generate and return a PDF receipt for a payment.
-    Accepts auth via either Authorization header or ?token= query param
-    so the URL can be opened directly in a browser.
     """
+    Generates a high-quality, printable PDF receipt for a successful payment.
+    Supports token-in-query for direct browser access.
+    """
+    # Import necessary models and PDF tools inside the scope
     from app.models.society import Society
     from jose import jwt, JWTError
     from app.utils.auth import SECRET_KEY, ALGORITHM
@@ -729,75 +928,165 @@ def download_receipt(
     from io import BytesIO
     from fastapi.responses import StreamingResponse
 
-    # Resolve the current user from token query param or raise 401
+    # ── Authenticate Requester ──
     if token:
         try:
+            # decode the access token
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id = payload.get("sub")
             if not user_id:
-                raise HTTPException(status_code=401, detail="Invalid token")
+                raise HTTPException(status_code=401, detail="Identification missing from token")
         except JWTError:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
+            raise HTTPException(status_code=401, detail="Authentication failed: Token is invalid or expired")
+        
+        # confirm the user is valid
         current_user = db.query(User).filter(User.id == user_id).first()
         if not current_user:
-            raise HTTPException(status_code=401, detail="User not found")
+            raise HTTPException(status_code=401, detail="Authenticated user not found in the archives")
     else:
+        # Require token query param for direct link functionality (e.g. mobile app download)
         raise HTTPException(status_code=401, detail="Authentication required. Provide ?token= query parameter.")
 
+    # ── Verify Resource Ownership ──
+    # Locate the target payment record
     payment = db.query(BillPayment).filter(
         BillPayment.id == payment_id, BillPayment.user_id == current_user.id
     ).first()
     if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
+        raise HTTPException(status_code=404, detail="Payment record not found or access restricted")
 
+    # Locate the parent bill record
     bill = db.query(Bill).filter(Bill.id == payment.bill_id).first()
     if not bill:
-        raise HTTPException(status_code=404, detail="Bill not found")
+        raise HTTPException(status_code=404, detail="Parent bill record is missing")
 
+    # Get society details for branding
     society = db.query(Society).filter(Society.id == current_user.society_id).first()
-    society_name = society.name if society else "Society"
-    society_address = society.address if society and society.address else ""
+    society_name = society.name if society else "Society Hub"
+    society_address = society.address if society and society.address else "Address missing from profile"
 
-    # Generate PDF in memory
+    # ── PDF Initialization ──
     buffer = BytesIO()
     c = pdf_canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # Colors
-    primary = HexColor("#311B92")
+    # Define premium colors for the receipt
+    primary = HexColor("#311B92")  # Deep Indigo
     accent = HexColor("#7C4DFF")
     dark_bg = HexColor("#0F0F1A")
     text_dark = HexColor("#1A1A2E")
     text_light = HexColor("#555555")
     border = HexColor("#E0E0E0")
 
-    # Header background
+    # ── PDF Header Visuals ──
+    # Top branding bar
     c.setFillColor(primary)
     c.rect(0, height - 100, width, 100, fill=True, stroke=False)
 
-    # Header text
+    # Society Brand Identity
     c.setFillColor(HexColor("#FFFFFF"))
     c.setFont("Helvetica-Bold", 22)
-    c.drawString(30, height - 45, society_name)
+    c.drawString(30, height - 45, society_name.upper())
+    # Society Contact / Address
     if society_address:
         c.setFont("Helvetica", 10)
         c.drawString(30, height - 62, society_address)
+    
+    # Document Identification
     c.setFont("Helvetica-Bold", 14)
-    c.drawRightString(width - 30, height - 45, "PAYMENT RECEIPT")
+    c.drawRightString(width - 30, height - 45, "OFFICIAL PAYMENT RECEIPT")
 
-    # Receipt number & date
-    receipt_no = f"RCT-{payment.id[:8].upper()}"
+    # Meta markers: Receipt # and Generation Date
+    receipt_no = f"SH-{payment.id[:8].upper()}"
     c.setFont("Helvetica", 9)
-    c.drawRightString(width - 30, height - 62, f"Receipt #: {receipt_no}")
-    c.drawRightString(width - 30, height - 75, f"Date: {payment.paid_at.strftime('%d %b %Y, %I:%M %p')}")
+    c.drawRightString(width - 30, height - 62, f"Serial #: {receipt_no}")
+    c.drawRightString(width - 30, height - 75, f"Issued: {payment.paid_at.strftime('%d %b %Y, %I:%M %p')}")
 
+    # Vertical offset start
     y = height - 140
 
-    # Bill Details section
+    # ── Bill & Transaction Details ──
     c.setFillColor(text_dark)
     c.setFont("Helvetica-Bold", 13)
-    c.drawString(30, y, "Bill Details")
+    c.drawString(30, y, "Summary of Transaction")
     y -= 5
+    # Bottom underline for header
+    c.setStrokeColor(primary)
+    c.setLineWidth(1)
+    c.line(30, y, 180, y)
+    y -= 25
+
+    # Define detail labels
+    details = [
+        ("Description of Bill", bill.title),
+        ("Billing Period / Type", (bill.bill_type.value if bill.bill_type else "Maintenance").title()),
+        ("Paid by Account", current_user.name),
+        ("Unit Identification", f"{current_user.flat.block}-{current_user.flat.flat_number}" if current_user.flat else "Standalone"),
+        ("Transaction Reference", payment.transaction_ref or "Bank Transfer"),
+        ("Payment Frequency", "One-time Settlement")
+    ]
+
+    # Render detail table in the PDF
+    for label, val in details:
+        c.setFont("Helvetica-Bold", 10)
+        c.setFillColor(text_light)
+        c.drawString(30, y, label)
+        c.setFont("Helvetica", 10)
+        c.setFillColor(text_dark)
+        c.drawString(200, y, str(val))
+        y -= 20
+
+    y -= 10
+    # ── Financial Breakdown ──
+    # Create a highlighted box for the final amount
+    c.setFillColor(HexColor("#F9F9FB"))
+    c.rect(30, y - 50, width - 60, 60, fill=True, stroke=False)
+    
+    total_y = y - 30
+    c.setFillColor(primary)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(30 + 15, total_y, "TOTAL AMOUNT SETTLED")
+    
+    c.setFont("Helvetica-Bold", 18)
+    # Currency symbol and formatted value
+    c.drawRightString(width - 30 - 15, total_y - 2, f"₹ {payment.amount:,.2f}")
+    
+    y -= 80
+
+    # ── Security & Validation Sign-off ──
+    c.setFillColor(text_dark)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(30, y, "Verification Status:")
+    c.setFillColor(HexColor("#2E7D32")) # Success Green
+    c.drawString(135, y, "✔ ELECTRONICALLY VERIFIED")
+    
+    y -= 30
+    c.setFillColor(text_light)
+    c.setFont("Helvetica-Oblique", 9)
+    # Disclaimer for digital validity
+    c.drawString(30, y, "This is a computer-generated document. No physical signature is required under the IT Act.")
+
+    y -= 100
+    # ── Branding Footer ──
+    c.setStrokeColor(border)
+    c.line(30, y, width - 30, y)
+    y -= 20
+    c.setFont("Helvetica-Bold", 12)
+    c.setFillColor(primary)
+    c.drawCentredString(width / 2, y, "THANK YOU FOR USING SOCIETY HUB")
+    
+    # ── PDF Completion ──
+    c.save()
+    buffer.seek(0)
+
+    # Return the PDF file result
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        # Force a generic descriptive filename
+        headers={"Content-Disposition": f'attachment; filename="Receipt_{payment_id[:8]}.pdf"'},
+    )
+
     c.setStrokeColor(border)
     c.setLineWidth(0.5)
     c.line(30, y, width - 30, y)

@@ -1,27 +1,52 @@
+// Import React and hooks for managing state and memoized callbacks
 import React, { useCallback, useState } from 'react';
+// Import layout and UI feedback components from React Native
 import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+// Import themed MD3 components from React Native Paper
 import { Text, Surface, TouchableRipple, ProgressBar } from 'react-native-paper';
+// Import icons for visual brand consistency
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+// Import a series of global stores to aggregate data for the dashboard view
 import { useAuthStore, useBillsStore, useComplaintsStore, usePollsStore, useNotificationsStore, useDashboardStore } from '../../store';
+// Import reusable common UI components
 import { StatCard, SectionHeader, StatusBadge, LoadingScreen } from '../../components/Common';
+// Import hook to trigger data refreshes when the screen gains focus
 import { useFocusEffect } from '@react-navigation/native';
 
+/**
+ * DashboardScreen:
+ * The primary landing page for authenticated residents and admins.
+ * Provides a high-level summary of finances, issues, democracy, and quick actions.
+ */
 export default function DashboardScreen({ navigation }: any) {
+  // Extract user session to drive role-based UI logic
   const user = useAuthStore((s) => s.user);
+  
+  // ── Multi-Store Data Extraction ──
   const { bills, fetchBills } = useBillsStore();
   const { complaints, fetchComplaints } = useComplaintsStore();
   const { polls, fetchPolls } = usePollsStore();
   const { unreadCount, fetchUnreadCount } = useNotificationsStore();
   const { stats, fetchStats } = useDashboardStore();
+  
+  // ── UI Control State ──
   const [refreshing, setRefreshing] = useState(false);
 
+  /**
+   * loadData:
+   * Orchestrates a parallel fetch of all relevant dashboard modules.
+   */
   const loadData = useCallback(async () => {
     await Promise.all([fetchBills(), fetchComplaints(), fetchPolls(), fetchUnreadCount(), fetchStats()]);
   }, []);
 
+  // Sync data whenever the user navigates back to the Dashboard
   useFocusEffect(useCallback(() => { loadData(); }, []));
+  
+  // Implement Standard Pull-to-Refresh
   const onRefresh = async () => { setRefreshing(true); await loadData(); setRefreshing(false); };
 
+  // ── Derived View Logic ──
   const isAdmin = user?.role === 'admin';
   const dueBills = bills.filter(b => b.payment_status === 'due' || b.payment_status === 'overdue');
   const openComplaints = complaints.filter(c => c.status !== 'resolved');
@@ -30,9 +55,11 @@ export default function DashboardScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <ScrollView
+        // Primary refresh mechanism for mobile users
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#7C4DFF']} tintColor="#7C4DFF" />}
       >
-        {/* Greeting */}
+        
+        {/* ── Header: Personal Greeting & Notifications ── */}
         <View style={styles.greeting}>
           <View>
             <Text variant="bodyMedium" style={{ color: '#888' }}>Welcome back,</Text>
@@ -40,6 +67,7 @@ export default function DashboardScreen({ navigation }: any) {
               {user?.name?.split(' ')[0]} 👋
             </Text>
           </View>
+          {/* Notification bell with unread badge count */}
           <TouchableRipple onPress={() => navigation.navigate('Notifications')} borderless style={styles.bellContainer}>
             <View>
               <MaterialCommunityIcons name="bell-outline" size={26} color="#E8E8F0" />
@@ -52,14 +80,14 @@ export default function DashboardScreen({ navigation }: any) {
           </TouchableRipple>
         </View>
 
-        {/* Quick Stats */}
+        {/* ── Quick Stats: High priority action items ── */}
         <View style={styles.statsRow}>
           <StatCard icon="receipt" label="Due Bills" value={dueBills.length} color="#FF6D00" onPress={() => navigation.navigate('BillsTab')} />
           <StatCard icon="alert-circle" label="Open Issues" value={openComplaints.length} color="#FF5252" onPress={() => navigation.navigate('ComplaintsTab')} />
           <StatCard icon="vote" label="Active Polls" value={activePolls.length} color="#00E5FF" onPress={() => navigation.navigate('PollsTab')} />
         </View>
 
-        {/* Admin Analytics Card */}
+        {/* ── Admin Analytics Section: Financial health of the society ── */}
         {stats && isAdmin && (
           <>
             <SectionHeader title="Collection Overview" />
@@ -78,6 +106,7 @@ export default function DashboardScreen({ navigation }: any) {
                   </Text>
                 </View>
               </View>
+              {/* Visual representation of billing progress */}
               <ProgressBar progress={stats.billing.collection_rate / 100} color="#4CAF50"
                 style={{ height: 6, borderRadius: 3, backgroundColor: '#252542', marginTop: 8 }} />
               <View style={[styles.analyticsRow, { marginTop: 12 }]}>
@@ -94,6 +123,7 @@ export default function DashboardScreen({ navigation }: any) {
               </View>
             </Surface>
 
+            {/* Admin Analytics: Issue Status Summary */}
             <Surface style={[styles.analyticsCard, { marginTop: 6 }]} elevation={1}>
               <View style={styles.analyticsRow}>
                 <View style={{ flex: 1, alignItems: 'center' }}>
@@ -116,7 +146,7 @@ export default function DashboardScreen({ navigation }: any) {
           </>
         )}
 
-        {/* Resident personal stats */}
+        {/* ── Resident Analytics Section: Personal financial summary ── */}
         {stats && !isAdmin && (
           <>
             <SectionHeader title="Your Summary" />
@@ -139,7 +169,7 @@ export default function DashboardScreen({ navigation }: any) {
           </>
         )}
 
-        {/* Quick Links */}
+        {/* ── Grid: Quick Access Navigation ── */}
         <SectionHeader title="Quick Access" />
         <View style={styles.quickLinksRow}>
           {[
@@ -149,12 +179,8 @@ export default function DashboardScreen({ navigation }: any) {
             { icon: 'history', label: 'Payments', route: 'PaymentHistory', color: '#FFB74D' },
             { icon: 'receipt-text-outline', label: 'Expenses', route: 'SocietyExpensesList', color: '#FF5252' },
             { icon: 'file-document-multiple', label: 'Documents', route: 'SocietyDocumentsList', color: '#26C6DA' },
-            {
-              icon: 'cash-refund',
-              label: 'Claims',
-              route: 'ReimbursementsList',
-              color: '#E91E63'
-            },
+            { icon: 'cash-refund', label: 'Claims', route: 'ReimbursementsList', color: '#E91E63' },
+            // Only show Approvals path for users with authority
             ...((isAdmin || user?.resident_type === 'owner' || user?.resident_type === 'renter') ? [
               { icon: 'account-check', label: 'Approvals', route: 'ApprovalManagement', color: '#FF6D00' },
             ] : []),
@@ -170,7 +196,7 @@ export default function DashboardScreen({ navigation }: any) {
           ))}
         </View>
 
-        {/* Recent Bills */}
+        {/* ── Feed: Recent Bills ── */}
         <SectionHeader title="Recent Bills" action={{ label: 'View All', onPress: () => navigation.navigate('BillsTab') }} />
         {bills.slice(0, 3).map((bill) => (
           <TouchableRipple key={bill.id} onPress={() => navigation.navigate('BillsTab', { screen: 'BillDetail', params: { billId: bill.id } })}>
@@ -195,7 +221,7 @@ export default function DashboardScreen({ navigation }: any) {
           </TouchableRipple>
         ))}
 
-        {/* Open Complaints */}
+        {/* ── Feed: Recent Complaints ── */}
         <SectionHeader title="Recent Complaints" action={{ label: 'View All', onPress: () => navigation.navigate('ComplaintsTab') }} />
         {complaints.slice(0, 2).map((c) => (
           <TouchableRipple key={c.id} onPress={() => navigation.navigate('ComplaintsTab', { screen: 'ComplaintDetail', params: { complaintId: c.id } })}>
@@ -214,30 +240,36 @@ export default function DashboardScreen({ navigation }: any) {
           </TouchableRipple>
         ))}
 
+        {/* Bottom Spacing for Tab Bar overlap */}
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
 }
 
+// ── Shared UI Architecture ──
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F0F1A' },
+  container: { flex: 1, backgroundColor: '#0F0F1A' }, // Deep theme background
   greeting: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8,
   },
   bellContainer: { padding: 8, borderRadius: 20 },
+  // Styled indicator for unread notifications
   badge: {
     position: 'absolute', top: -4, right: -6, backgroundColor: '#FF5252',
     borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center',
   },
   badgeText: { color: '#FFF', fontSize: 10, fontWeight: '700' },
   statsRow: { flexDirection: 'row', paddingHorizontal: 12, paddingTop: 8 },
+  // Cards for analytics summaries
   analyticsCard: { backgroundColor: '#1A1A2E', borderRadius: 16, padding: 16, marginHorizontal: 16, marginVertical: 4 },
   analyticsRow: { flexDirection: 'row', gap: 16 },
+  // Grid layout for quick link icons
   quickLinksRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10, marginBottom: 8 },
   quickLink: { flex: 1, borderRadius: 16 },
   quickLinkCard: { backgroundColor: '#1A1A2E', borderRadius: 16, padding: 16, alignItems: 'center', paddingVertical: 14 },
+  // Generic list item card
   card: { backgroundColor: '#1A1A2E', borderRadius: 16, padding: 16, marginHorizontal: 16, marginVertical: 4 },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardIcon: {

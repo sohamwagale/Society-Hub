@@ -1,14 +1,27 @@
+// Import React and standard hooks for side effects, animation references, and local state
 import React, { useEffect, useRef, useState } from 'react';
+// Import layout, animation, and system utility components from React Native
 import { Animated, View, ScrollView, StyleSheet, Alert, Linking } from 'react-native';
+// Import themed MD3 components from React Native Paper for a high-fidelity UI
 import { Text, Surface, Button, TextInput, Divider, Portal, Modal, ProgressBar } from 'react-native-paper';
+// Import icons for visual branding and status indication
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+// Import expo-image-picker for handling payment receipt uploads
 import * as ImagePicker from 'expo-image-picker';
+// Import bills API for fetching details, initiating payments, and record management
 import { billsAPI } from '../../services/api';
+// Import shared TypeScript types for data consistency
 import { Bill, BillPayment, BillResidentStatus } from '../../types';
+// Import common UI components for consistent state feedback
 import { StatusBadge, LoadingScreen } from '../../components/Common';
+// Import global stores for aggregated billing data and user session context
 import { useBillsStore, useAuthStore } from '../../store';
 
-// ─── Animated success overlay shown after payment ───────────────────────────
+/**
+ * PaymentSuccessView:
+ * A high-engagement, animated overlay displayed immediately after a successful financial transaction.
+ * Designed to provides positive reinforcement and quick access to post-payment actions (receipts).
+ */
 function PaymentSuccessView({
   bill,
   payment,
@@ -22,10 +35,12 @@ function PaymentSuccessView({
   onUploadScreenshot: () => void;
   onDone: () => void;
 }) {
+  // Animation value references for coordinating a smooth entrance
   const scale = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(60)).current;
 
+  // Trigger sequence of animations on component mount
   useEffect(() => {
     Animated.parallel([
       Animated.spring(scale, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
@@ -34,6 +49,7 @@ function PaymentSuccessView({
     ]).start();
   }, []);
 
+  // Format the payment timestamp for the visual receipt strip
   const paidAt = payment.paid_at
     ? new Date(payment.paid_at).toLocaleString('en-IN', {
       day: '2-digit', month: 'short', year: 'numeric',
@@ -44,7 +60,7 @@ function PaymentSuccessView({
   return (
     <Animated.View style={[styles.successOverlay, { opacity }]}>
       <Animated.View style={[styles.successCard, { transform: [{ scale }, { translateY: slideUp }] }]}>
-        {/* Pulsing check icon */}
+        {/* Visual focal point: Pulsing success icon wrap */}
         <View style={styles.successIconWrap}>
           <View style={styles.successIconOuter}>
             <View style={styles.successIconInner}>
@@ -53,11 +69,12 @@ function PaymentSuccessView({
           </View>
         </View>
 
+        {/* Transaction Summary Headings */}
         <Text style={styles.successTitle}>Payment Successful!</Text>
         <Text style={styles.successAmount}>₹{Number(payment.amount).toLocaleString('en-IN')}</Text>
         <Text style={styles.successSubtitle}>for {bill.title}</Text>
 
-        {/* Receipt strip */}
+        {/* Pseudo-Receipt Strip: Organized transaction metadata */}
         <View style={styles.receiptStrip}>
           <View style={styles.receiptRow}>
             <Text style={styles.receiptLabel}>Method</Text>
@@ -77,7 +94,7 @@ function PaymentSuccessView({
           </View>
         </View>
 
-        {/* Actions */}
+        {/* Immediate Post-Payment Tasks */}
         <Button
           mode="contained"
           icon="file-pdf-box"
@@ -111,27 +128,45 @@ function PaymentSuccessView({
   );
 }
 
-// ─── Main screen ─────────────────────────────────────────────────────────────
+/**
+ * BillDetailScreen:
+ * The primary interface for inspecting and resolving a specific financial bill.
+ * Handles Razorpay checkout flow, administrative auditing, and manual payment verification.
+ */
 export default function BillDetailScreen({ route, navigation }: any) {
+  // Extract identifier from navigation route params
   const { billId } = route.params;
+  
+  // Extract user context to determine UI authority (Audit vs Action)
   const { user } = useAuthStore();
+  
+  // ── Core Data State ──
   const [bill, setBill] = useState<Bill | null>(null);
   const [residentStatus, setResidentStatus] = useState<BillResidentStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // ── Interaction State ──
   const [paying, setPaying] = useState(false);
   const [transactionRef, setTransactionRef] = useState('');
   const [paymentId, setPaymentId] = useState<string | null>(null);
-  const [successPayment, setSuccessPayment] = useState<BillPayment | null>(null); // ← new
+  const [successPayment, setSuccessPayment] = useState<BillPayment | null>(null); // State to trigger success overlay
+  
+  // ── Global Store Actions ──
   const { fetchBills } = useBillsStore();
 
-  // Edit Mode state
+  // ── Administrative Edit State ──
   const [showEdit, setShowEdit] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Initial load logic
   useEffect(() => { loadBill(); }, [billId]);
 
+  /**
+   * loadBill:
+   * Fetches the full bill object and conditional metadata (Resident Status list for Admins).
+   */
   const loadBill = async () => {
     try {
       const data = await billsAPI.get(billId);
@@ -139,38 +174,48 @@ export default function BillDetailScreen({ route, navigation }: any) {
       setEditTitle(data.title);
       setEditAmount(data.amount.toString());
 
+      // If user is admin, fetch the full audit list of who has paid
       if (user?.role === 'admin') {
         const residents = await billsAPI.getResidentStatus(billId);
         setResidentStatus(residents);
       } else {
+        // If resident, check if they have a payment ID for valid receipts
         const status = data.payment_status;
         if (status === 'paid' || status === 'overdue_paid') {
           try {
             const history = await billsAPI.paymentHistory();
             const match = history.find((p) => p.bill_id === billId);
             if (match) setPaymentId(match.id);
-          } catch { }
+          } catch { /* Silent fail for history lookup */ }
         }
       }
-    } catch { Alert.alert('Error', 'Failed to load bill'); }
-    finally { setLoading(false); }
+    } catch { 
+      Alert.alert('Error', 'Failed to load bill'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
-  // ── Razorpay checkout ────────────────────────────────────────────────────
+  /**
+   * handlePayViaRazorpay:
+   * Orchestrates the 3-stage payment cycle:
+   * 1. Order Creation (Backend)
+   * 2. UI Checkout (Native SDK)
+   * 3. Signature Verification (Backend with Network Resilience)
+   */
   const handlePayViaRazorpay = async () => {
     if (!bill) return;
     setPaying(true);
 
-    // Track which stage we are at so we can give the right error message
-    // Stage: 'order' → 'razorpay' → 'verify'
+    // Progression tracking for precise error handling
     let stage: 'order' | 'razorpay' | 'verify' = 'order';
     let rzpPaymentId: string | undefined;
 
     try {
-      // ── Stage 1: Create order on backend ──────────────────────────────────
+      // ── Stage 1: Security Handshake ──
       const order = await billsAPI.createRazorpayOrder(bill.id);
 
-      // ── Stage 2: Open Razorpay checkout sheet ─────────────────────────────
+      // ── Stage 2: Native Interaction ──
       stage = 'razorpay';
       const RazorpayCheckout = require('react-native-razorpay').default;
       const options = {
@@ -189,16 +234,14 @@ export default function BillDetailScreen({ route, navigation }: any) {
       };
 
       const paymentData = await RazorpayCheckout.open(options);
-      // If we reach here, Razorpay has confirmed the payment — money was charged.
+      // Entry point after successful native swipe/UPI interaction
       rzpPaymentId = paymentData.razorpay_payment_id;
 
-      // Log full SDK response so we can diagnose field name issues
+      // Debugging trace for environment-specific field names
       console.log('[Razorpay SDK SUCCESS] Full paymentData:', JSON.stringify(paymentData));
 
-      // ── Stage 3: Verify signature & record on backend ─────────────────────
-      // NOTE: After Razorpay's sheet closes, Android briefly drops the WiFi
-      // connection and then reconnects (~1-2s). We must retry the verify call
-      // to ensure it reaches the server once the network recovers.
+      // ── Stage 3: Integrity Check ──
+      // Retrying logic to account for Android's temporary network drop post-Razorpay sheet
       stage = 'verify';
       const verifyBody = {
         razorpay_order_id: paymentData.razorpay_order_id,
@@ -213,31 +256,31 @@ export default function BillDetailScreen({ route, navigation }: any) {
           console.log(`[Razorpay Verify] Attempt ${attempt}/${maxAttempts}...`);
           payment = await billsAPI.verifyRazorpayPayment(bill.id, verifyBody);
           console.log('[Razorpay Verify] Success on attempt', attempt);
-          break; // success — exit retry loop
+          break; // Exit loop on backend confirmation
         } catch (retryErr: any) {
-          const isNetworkError = !retryErr?.response; // No response = network-level failure
+          const isNetworkError = !retryErr?.response;
           console.log(`[Razorpay Verify] Attempt ${attempt} failed:`, retryErr?.code, retryErr?.message);
           if (isNetworkError && attempt < maxAttempts) {
-            // Network not yet recovered — wait and retry
+            // Exponential backoff or simple delay for network recovery
             await new Promise(resolve => setTimeout(resolve, attempt * 1000));
           } else {
-            // Either a real server error (4xx/5xx) or ran out of retries
-            throw retryErr;
+            throw retryErr; // Bubbles up to main catch block
           }
         }
       }
 
-      // ── Success ────────────────────────────────────────────────────────────
+      // ── Success State Transitions ──
       if (!payment) throw new Error('Payment verification failed after all retries');
       setPaymentId(payment.id);
-      setSuccessPayment(payment);
-      await fetchBills();
-      loadBill();
+      setSuccessPayment(payment); // Triggers visual celebration overlay
+      await fetchBills(); // Sync global list
+      loadBill(); // Sync current screen details
 
     } catch (e: any) {
       console.log('[Razorpay] Error at stage:', stage, JSON.stringify(e));
 
       if (stage === 'razorpay') {
+        // Handle explicit user cancellation versus technical declination
         const isCancelled =
           e?.code === 0 ||
           e?.code === 'PAYMENT_CANCELLED' ||
@@ -247,13 +290,13 @@ export default function BillDetailScreen({ route, navigation }: any) {
         if (!isCancelled) {
           Alert.alert(
             'Payment Declined',
-            e?.description || e?.message || 'Your payment could not be processed. Please try a different payment method.',
+            e?.description || e?.message || 'Your payment could not be processed.',
             [{ text: 'Try Again', style: 'default' }],
           );
         }
 
       } else if (stage === 'verify') {
-        // Money was charged by Razorpay — show the ACTUAL server error for diagnosis
+        // Critical scenario: User was charged but backend verification failed
         const serverError = e?.response?.data?.detail || e?.message || 'Unknown server error';
         const httpStatus = e?.response?.status ?? 'N/A';
         console.log('[Razorpay Verify] Server error:', serverError, 'Status:', httpStatus);
@@ -266,7 +309,7 @@ export default function BillDetailScreen({ route, navigation }: any) {
       } else {
         Alert.alert(
           'Could Not Initiate Payment',
-          e?.response?.data?.detail || e?.message || 'Failed to start the payment. Please try again.',
+          e?.response?.data?.detail || e?.message || 'Failed to start the payment process.',
         );
       }
     } finally {
@@ -274,7 +317,10 @@ export default function BillDetailScreen({ route, navigation }: any) {
     }
   };
 
-  // ── Manual / offline payment ─────────────────────────────────────────────
+  /**
+   * recordPayment:
+   * Manual fallback for offline payments (Cash/Check) recorded by the resident.
+   */
   const recordPayment = async (method = 'Manual') => {
     if (!bill) return;
     setPaying(true);
@@ -298,6 +344,10 @@ export default function BillDetailScreen({ route, navigation }: any) {
     } finally { setPaying(false); }
   };
 
+  /**
+   * handleDownloadReceipt:
+   * Redirects user to the direct PDF link for their transaction record.
+   */
   const handleDownloadReceipt = async (pId: string) => {
     try {
       const url = await billsAPI.getReceiptUrl(pId);
@@ -307,6 +357,10 @@ export default function BillDetailScreen({ route, navigation }: any) {
     }
   };
 
+  /**
+   * pickReceipt:
+   * Multi-stage image selection and upload for financial verification screenshots.
+   */
   const pickReceipt = async (pId: string) => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (!result.canceled) {
@@ -317,6 +371,10 @@ export default function BillDetailScreen({ route, navigation }: any) {
     }
   };
 
+  /**
+   * handleDelete:
+   * Permanent destructive action for bill records (Admin Only).
+   */
   const handleDelete = () => {
     Alert.alert('Delete Bill', 'Are you sure? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
@@ -332,6 +390,10 @@ export default function BillDetailScreen({ route, navigation }: any) {
     ]);
   };
 
+  /**
+   * handleUpdate:
+   * Standard form submission for administrative modifications.
+   */
   const handleUpdate = async () => {
     setSaving(true);
     try {
@@ -344,6 +406,10 @@ export default function BillDetailScreen({ route, navigation }: any) {
     finally { setSaving(false); }
   };
 
+  /**
+   * toggleArchive:
+   * Logic to soft-remove a bill from active rotation (Admin Only).
+   */
   const toggleArchive = async () => {
     try {
       await billsAPI.update(billId, { is_active: !bill?.is_active });
@@ -355,13 +421,14 @@ export default function BillDetailScreen({ route, navigation }: any) {
     }
   };
 
+  // ── Global Context Derived Logic ──
   if (loading) return <LoadingScreen />;
   if (!bill) return null;
 
   const isAdmin = user?.role === 'admin';
   const isPaid = bill.payment_status === 'paid' || bill.payment_status === 'overdue_paid';
 
-  // Deduplicate resident status by flat for Admin view
+  // Audit Logic: Deduplicate and sort resident payment status by flat for Admin audit views
   const uniqueFlatsMap = new Map<string, BillResidentStatus>();
   residentStatus.forEach(r => {
     const key = r.flat && r.flat !== 'N/A' ? r.flat : r.user_id;
@@ -379,9 +446,11 @@ export default function BillDetailScreen({ route, navigation }: any) {
   return (
     <View style={{ flex: 1, backgroundColor: '#0F0F1A' }}>
       <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        {/* Admin Actions */}
+        
+        {/* ── Action Strip (Admin Only) ── */}
         {isAdmin && (
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+            {/* Archive toggle: only available if collection is not 100% complete for active bills */}
             {progress < 1 && (
               <Button
                 mode="outlined"
@@ -399,15 +468,17 @@ export default function BillDetailScreen({ route, navigation }: any) {
           </View>
         )}
 
-        {/* Bill Info */}
+        {/* ── Bill Metadata Display ── */}
         <Surface style={styles.card} elevation={1}>
           <View style={styles.headerRow}>
+            {/* Visual Icon based on fund category */}
             <View style={[styles.iconBox, { backgroundColor: bill.bill_type === 'maintenance' ? '#1A1A3E' : '#2E1A1A' }]}>
               <MaterialCommunityIcons
                 name={bill.bill_type === 'maintenance' ? 'home-city' : 'cash-plus'}
                 size={32} color={bill.bill_type === 'maintenance' ? '#7C4DFF' : '#FF6D00'}
               />
             </View>
+            {/* Context-aware badges */}
             {!isAdmin && <StatusBadge status={bill.payment_status || 'due'} />}
             {isAdmin && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -426,6 +497,7 @@ export default function BillDetailScreen({ route, navigation }: any) {
 
           <Divider style={{ marginVertical: 16, backgroundColor: '#252542' }} />
 
+          {/* Core Economic Details */}
           <View style={styles.detailRow}>
             <Text variant="bodyMedium" style={{ color: '#888' }}>Amount</Text>
             <Text variant="titleLarge" style={{ color: '#00E5FF', fontWeight: '700' }}>₹{bill.amount.toLocaleString()}</Text>
@@ -446,7 +518,7 @@ export default function BillDetailScreen({ route, navigation }: any) {
           )}
         </Surface>
 
-        {/* Admin: Collection Status */}
+        {/* ── Collection Audit (Admin Only) ── */}
         {isAdmin && (
           <Surface style={[styles.card, { marginTop: 12 }]} elevation={1}>
             <Text variant="titleMedium" style={{ color: '#E8E8F0', fontWeight: '600', marginBottom: 12 }}>
@@ -461,17 +533,19 @@ export default function BillDetailScreen({ route, navigation }: any) {
               </View>
               <ProgressBar progress={progress} color="#4CAF50" style={{ height: 8, borderRadius: 4, backgroundColor: '#252542' }} />
             </View>
+            {/* Scrollable list of resident statuses */}
             {merchantResidentsList(flatStatuses, bill.amount)}
           </Surface>
         )}
 
-        {/* Resident: Payment Actions */}
+        {/* ── Payment Module (Resident Only) ── */}
         {!isPaid && !isAdmin && (
           <Surface style={[styles.card, { marginTop: 12 }]} elevation={1}>
             <Text variant="titleMedium" style={{ color: '#E8E8F0', fontWeight: '600', marginBottom: 16 }}>
               💳 Pay ₹{bill.amount.toLocaleString()}
             </Text>
             <View style={{ gap: 12 }}>
+              {/* Primary: Online Digital Payment Flow */}
               <Button
                 mode="contained"
                 onPress={handlePayViaRazorpay}
@@ -482,8 +556,9 @@ export default function BillDetailScreen({ route, navigation }: any) {
                 icon="credit-card-outline"
                 contentStyle={{ paddingVertical: 4 }}
               >
-                Pay ₹{bill.amount.toLocaleString()} via Razorpay
+                Pay via Razorpay
               </Button>
+              {/* Secondary: Manual Override for Cash/Check collection */}
               <Button
                 mode="outlined"
                 onPress={() => recordPayment('Manual')}
@@ -499,7 +574,7 @@ export default function BillDetailScreen({ route, navigation }: any) {
           </Surface>
         )}
 
-        {/* Resident: Paid state */}
+        {/* ── Transaction Record Module (Resident After Payment) ── */}
         {isPaid && !isAdmin && !successPayment && (
           <Surface style={[styles.card, { marginTop: 12, borderLeftColor: '#1B5E20', borderLeftWidth: 4 }]} elevation={1}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -510,7 +585,7 @@ export default function BillDetailScreen({ route, navigation }: any) {
           </Surface>
         )}
 
-        {/* Edit Modal */}
+        {/* ── Administrative Edit Overlays ── */}
         <Portal>
           <Modal visible={showEdit} onDismiss={() => setShowEdit(false)} contentContainerStyle={styles.modal}>
             <Text variant="titleLarge" style={{ color: '#E8E8F0', fontWeight: '700', marginBottom: 16 }}>Edit Bill</Text>
@@ -521,7 +596,7 @@ export default function BillDetailScreen({ route, navigation }: any) {
         </Portal>
       </ScrollView>
 
-      {/* Animated success overlay – renders on top of everything */}
+      {/* Logic for high-engagement celebration overlay */}
       {successPayment && bill && (
         <PaymentSuccessView
           bill={bill}
@@ -530,7 +605,7 @@ export default function BillDetailScreen({ route, navigation }: any) {
           onUploadScreenshot={() => pickReceipt(successPayment.id)}
           onDone={() => {
             setSuccessPayment(null);
-            navigation.goBack();
+            navigation.goBack(); // Return to list view after acknowledgment
           }}
         />
       )}
@@ -538,11 +613,17 @@ export default function BillDetailScreen({ route, navigation }: any) {
   );
 }
 
-// ─── Helper Components ────────────────────────────────────────────────────────
+// ── Shared Helper UI Components ──
+
+/**
+ * merchantResidentsList:
+ * Renders a compact, detailed list of audit records for the society administrator.
+ */
 const merchantResidentsList = (list: BillResidentStatus[], amount: number) => (
   <View style={{ maxHeight: 300 }}>
     {list.map((r, i) => (
       <View key={r.user_id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: '#252542' }}>
+        {/* Unit identifier icon */}
         <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: r.status === 'paid' ? '#1B5E20' : '#2E1A1A', justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
           <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 12 }}>{r.flat.split('-')[1] || '?'}</Text>
         </View>
@@ -551,6 +632,7 @@ const merchantResidentsList = (list: BillResidentStatus[], amount: number) => (
           <Text variant="bodySmall" style={{ color: '#888' }}>{r.flat} • ₹{r.amount !== undefined ? r.amount.toLocaleString() : amount.toLocaleString()}</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
+          {/* Status highlight based on liability resolution */}
           <Text style={{ color: r.status === 'paid' ? '#4CAF50' : '#FF5252', fontWeight: '700', fontSize: 13 }}>
             {r.status === 'paid' ? 'PAID' : 'DUE'}
           </Text>
@@ -561,6 +643,10 @@ const merchantResidentsList = (list: BillResidentStatus[], amount: number) => (
   </View>
 );
 
+/**
+ * awaitDownloadButtons:
+ * Resident-specific actions available once a bill is resolved.
+ */
 const awaitDownloadButtons = (pid: string, dl: any, up: any) => (
   <View style={{ gap: 8 }}>
     <Button mode="contained" icon="file-pdf-box" onPress={() => dl(pid)} buttonColor="#311B92" textColor="#E8E8F0" style={{ borderRadius: 10 }}>
@@ -572,7 +658,7 @@ const awaitDownloadButtons = (pid: string, dl: any, up: any) => (
   </View>
 );
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ── Local Design Tokens ──
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F0F1A' },
   card: { backgroundColor: '#1A1A2E', borderRadius: 20, padding: 20 },
@@ -582,7 +668,7 @@ const styles = StyleSheet.create({
   input: { marginBottom: 12, backgroundColor: '#1A1A2E' },
   modal: { backgroundColor: '#1A1A2E', margin: 20, padding: 24, borderRadius: 20 },
 
-  // ── Success overlay ──
+  /* ── Post-Payment Success Overlay Tokens ── */
   successOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(10, 10, 20, 0.96)',
