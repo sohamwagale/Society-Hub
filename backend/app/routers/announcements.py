@@ -1,34 +1,23 @@
-# Import standard OS module for file path and extension operations
 import os
-# Import uuid for generating unique identifier keys for announcements and files
 import uuid
-# Import Optional for type hinting nullable fields
 from typing import Optional
-# Import FastAPI components for routing, dependencies, and complex form handling
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-# Import SQLAlchemy Session for database connectivity
 from sqlalchemy.orm import Session
-# Import the database session utility
 from app.database import get_db
-# Import User model for authentication and authorization logic
+
 from app.models.user import User
-# Import Announcement models and priority enums
 from app.models.announcement import Announcement, AnnouncementPriority
-# Import Pydantic schemas for data validation
 from app.schemas.announcement import AnnouncementUpdate, AnnouncementOut
-# Import authentication utilities for role-based access control
+
 from app.utils.auth import get_current_user, require_role
-# Import cloud storage utilities for managing binary attachments
 from app.utils.storage import upload_file, delete_file
-# Import notification service to broadcast society-wide alerts
+
 from app.services.notification_service import notify_all_residents
-# Import notification type enum
 from app.models.notification import NotificationType
 
-# Initialize router with relevant prefix and tag grouping
+
 router = APIRouter(prefix="/api/announcements", tags=["Announcements"])
 
-# Set of allowed extensions for automatic visual indicator tagging
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
@@ -42,10 +31,9 @@ async def create_announcement(
     body: str = Form(...),
     priority: str = Form("normal"),
     pinned: bool = Form(False),
-    # Optional file attachment (notice PDF or image)
     attachment: Optional[UploadFile] = File(None),
+
     db: Session = Depends(get_db),
-    # Restricted to Admin role
     admin: User = Depends(require_role("admin")),
 ):
     # Initialize attachment metadata
@@ -54,61 +42,45 @@ async def create_announcement(
 
     # ── Attachment Processing ──
     if attachment and attachment.filename:
-        # Generate a stable unique ID for the file name
         att_id = str(uuid.uuid4())
-        # Isolate the original file extension
         ext = os.path.splitext(attachment.filename)[1].lower()
-        # Construct the final cloud storage filename
         filename = f"{att_id}{ext}"
-        # Determine MIME type or fallback to binary stream
         content_type = attachment.content_type or "application/octet-stream"
-        # Buffer the file stream payload
+
         data = await attachment.read()
-        # Upload to 'announcements' bucket in cloud storage
+
         attachment_url = upload_file("announcements", filename, data, content_type)
-        # Identify type for frontend icon display (Image vs PDF fallback)
-        attachment_type = "image" if ext in IMAGE_EXTENSIONS else "pdf"
+        attachment_type = "image" if ext in IMAGE_EXTENSIONS else "pdf" # Type for frontend icon display
 
     # ── Database Initialization ──
     ann = Announcement(
-        # Generate primary key
         id=str(uuid.uuid4()),
-        # Scope to the admin's society
         society_id=admin.society_id,
-        # Content fields
+        created_by=admin.id,
+
         title=title,
         body=body,
-        # Cast priority from string to internal Enum
-        priority=AnnouncementPriority(priority),
-        # Pinned notices stay at the top of the feed
+        priority=AnnouncementPriority(priority), # Cast priority from string to internal Enum
         pinned=pinned,
-        # Attachment references
+
         attachment_url=attachment_url,
         attachment_type=attachment_type,
-        # Audit field: track who published this
-        created_by=admin.id,
     )
-    # Stage record
     db.add(ann)
-    # Commit transaction
     db.commit()
-    # Refresh to load timestamps
     db.refresh(ann)
 
-    # ── Notification Broadcast ──
-    # Push notification to all active residents in the society immediately
-    notify_all_residents(
-        db, f"📢 {ann.title}",
-        # Send a snippet of the body in the notification payload
-        ann.body[:100] + ("..." if len(ann.body) > 100 else ""),
-        NotificationType.GENERAL, ann.id,
-        society_id=admin.society_id,
-    )
 
-    # ── Response Formatting ──
+    notify_all_residents(
+        db = db,
+        title = ann.title, #type:ignore
+        body = ann.body[:100] + ("..." if len(ann.body) > 100 else ""), #type:ignore
+        notification_type = NotificationType.GENERAL,
+        reference_id = ann.id, #type:ignore
+        society_id = admin.society_id, #type:ignore
+    )
     out = AnnouncementOut.model_validate(ann)
-    # Inject creator name manually for UI display
-    out.creator_name = admin.name
+    out.creator_name = admin.name # For UI display
     return out
 
 
@@ -116,12 +88,13 @@ async def create_announcement(
 
 # GET endpoint to fetch all bulletins for the user's community
 @router.get("", response_model=list[AnnouncementOut])
-def list_announcements(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # Query notices belonging only to the user's society
+def list_announcements(
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
     anns = (
         db.query(Announcement)
         .filter(Announcement.society_id == current_user.society_id)
-        # Order by Pinned status (top) then by date (newest)
         .order_by(Announcement.pinned.desc(), Announcement.created_at.desc())
         .all()
     )
@@ -146,19 +119,19 @@ def delete_announcement(
     _: User = Depends(require_role("admin")),
 ):
     # Locate notice
-    ann = db.query(Announcement).filter(Announcement.id == announcement_id).first()
-    # verify existence
+    ann = (
+        db.query(Announcement)
+        .filter(Announcement.id == announcement_id)
+        .first()
+    )
+
     if not ann:
         raise HTTPException(status_code=404, detail="Announcement record not found")
     
-    # ── Cleanup ──
-    # Permanently delete the associated file from cloud storage if active
-    if ann.attachment_url:
+    if ann.attachment_url is not None:
         delete_file(ann.attachment_url)
     
-    # delete from DB
     db.delete(ann)
-    # Finalize transaction
     db.commit()
 
 
@@ -189,8 +162,11 @@ def update_announcement(
     db: Session = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ):
-    # retrieve bulletin
-    ann = db.query(Announcement).filter(Announcement.id == announcement_id).first()
+    ann = (
+        db.query(Announcement)
+        .filter(Announcement.id == announcement_id)
+        .first()
+    )
     if not ann:
         raise HTTPException(status_code=404, detail="Target announcement missing")
     
