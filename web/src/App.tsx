@@ -7,7 +7,7 @@ import ShippingPolicy from './pages/ShippingPolicy';
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
