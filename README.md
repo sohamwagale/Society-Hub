@@ -13,7 +13,7 @@ The project is structured as a monorepo containing three main components: a robu
 - **Documents:** Centralized document storage and sharing using **Supabase** buckets.
 - **Push Notifications:** Real-time push notifications using the **Expo** push notification service.
 
-## 🏗️ Architecture & Tech Stack
+## 🏗️ Architecture and Tech Stack
 
 The application is split into three main directories:
 
