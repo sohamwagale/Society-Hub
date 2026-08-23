@@ -3,12 +3,12 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import axios from 'axios';
 import type {
   User, Bill, Complaint, Poll, ReimbursementRequest,
-  Notification, Announcement, ResidentInfo, DashboardStats
+  Notification, Announcement, DashboardStats
 } from '../types';
 import {
   authAPI, billsAPI, complaintsAPI, pollsAPI,
   reimbursementsAPI, notificationsAPI, announcementsAPI,
-  residentsAPI, dashboardAPI
+  dashboardAPI
 } from '../services/api';
 
 function isUnauthorized(error: unknown): boolean {

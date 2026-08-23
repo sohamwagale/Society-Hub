@@ -16,7 +16,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-2">
+    <div className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-1.5rem)] bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-2">
       <div className="px-4 py-2 border-b border-slate-100 flex justify-between items-center bg-slate-50">
         <span className="font-bold text-slate-800 text-sm">Notifications</span>
         <div className="flex gap-2">
