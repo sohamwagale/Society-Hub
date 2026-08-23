@@ -97,4 +97,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   );
 };
 
+//Nothing
+
 export default DashboardHeader;
