@@ -25,6 +25,7 @@ jobs:
   # Build job
   build:
     runs-on: ubuntu-latest
+    environment: github-pages
     defaults:
       run:
         working-directory: web
@@ -44,7 +45,7 @@ jobs:
 
       - name: Build web application
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
         run: |
           npm run build
 
