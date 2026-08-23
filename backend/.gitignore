@@ -51,3 +51,6 @@ yarn-error.*
 # keys
 my-society.json
 google-services.json
+
+*.db
+firebase-admin.js
