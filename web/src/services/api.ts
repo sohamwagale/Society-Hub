@@ -33,7 +33,8 @@ import type {
   SocietyExpenseCreate,
   SocietyDocument,
   BillResidentStatus,
-} from '../types/index.ts'
+  ActivityLog,
+} from '../types';
 
 let _token: string | null = null;
 
@@ -53,7 +54,7 @@ const tokenStorage = {
   },
 };
 
-const BASE_URL = 'http://13.126.10.73:8000/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -445,6 +446,19 @@ export const societyAPI = {
   },
   listFlatsForSociety: async (societyId: string): Promise<SocietyFlatSummary[]> => {
     const { data } = await api.get<SocietyFlatSummary[]>(`/society/${societyId}/flats`);
+    return data;
+  },
+  create: async (society: { name: string; address?: string }): Promise<Society> => {
+    const { data } = await api.post<Society>('/society', society);
+    return data;
+  },
+};
+
+export const activityLogAPI = {
+  list: async (skip = 0, limit = 50, entityType?: string): Promise<ActivityLog[]> => {
+    const params: any = { skip, limit };
+    if (entityType) params.entity_type = entityType;
+    const { data } = await api.get<ActivityLog[]>('/activity-log', { params });
     return data;
   },
 };

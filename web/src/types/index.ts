@@ -374,3 +374,15 @@ export interface SocietyDocument {
   approved_by?: string;
   created_at: string;
 }
+
+export interface ActivityLog {
+  id: string;
+  user_id?: string | null;
+  user_name: string;
+  action: string;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  details?: string | null;
+  created_at: string;
+}
+

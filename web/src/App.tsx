@@ -1,13 +1,13 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Onboarding from './pages/Onboarding';
-import ProtectedRoute from './components/ProtectedRoute';
-import TermsAndConditions from './pages/TermsAndConditions';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import RefundPolicy from './pages/RefundPolicy';
-import ShippingPolicy from './pages/ShippingPolicy';
+import Dashboard from './features/dashboard/Dashboard';
+import Login from './features/auth/Login';
+import Register from './features/auth/Register';
+import Onboarding from './features/onboarding/Onboarding';
+import ProtectedRoute from './features/auth/ProtectedRoute';
+import TermsAndConditions from './features/legal/TermsAndConditions';
+import PrivacyPolicy from './features/legal/PrivacyPolicy';
+import RefundPolicy from './features/legal/RefundPolicy';
+import ShippingPolicy from './features/legal/ShippingPolicy';
 
 function App() {
   return (

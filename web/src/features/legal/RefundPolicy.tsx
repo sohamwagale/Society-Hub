@@ -9,7 +9,7 @@ export default function RefundPolicy() {
           <ChevronLeft size={20} />
           <span>Back to Home</span>
         </Link>
-        <h1 className="text-3xl font-bold text-slate-800 mb-6">Cancellation & Refund Policy</h1>
+        <h1 className="text-3xl font-bold text-slate-800 mb-6">Cancellation &amp; Refund Policy</h1>
 
         <div className="prose prose-slate max-w-none text-slate-600 space-y-4">
           <p className="text-lg font-medium">My Business does not support returns or refunds.</p>

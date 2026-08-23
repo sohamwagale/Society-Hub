@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store';
-import { societyAPI, onboardingAPI } from '../services/api';
-import type { Society, SocietyFlatSummary, CreateSocietyFlat } from '../types';
-import { Building2, LogOut, CheckCircle, Clock, Plus, Trash2, Home, Landmark } from 'lucide-react';
+import { useAuthStore } from '../../store';
+import { societyAPI, onboardingAPI } from '../../services/api';
+import type { Society, SocietyFlatSummary, CreateSocietyFlat } from '../../types';
+import { Building2, LogOut, Clock, Home, Landmark } from 'lucide-react';
 
 export const Onboarding: React.FC = () => {
   const { user, logout, refreshUser } = useAuthStore();
