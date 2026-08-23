@@ -75,6 +75,7 @@ export const Dashboard: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
         user={user}
         onLogout={handleLogoutClick}
         onResetSelections={() => {}}
@@ -95,7 +96,7 @@ export const Dashboard: React.FC = () => {
         />
 
         {/* Dynamic Nested Feature Views */}
-        <div className="flex-1 overflow-auto p-6 bg-slate-50">
+        <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 bg-slate-50">
           <div className="max-w-7xl mx-auto space-y-6">
             {activeTab === 'dashboard' && <OverviewTab />}
             {activeTab === 'announcements' && <AnnouncementsTab />}
