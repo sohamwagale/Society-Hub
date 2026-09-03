@@ -12,6 +12,8 @@ interface DashboardHeaderProps {
   setIsNotificationOpen: (open: boolean) => void;
   onMarkAllRead: () => void;
   onClearAll: () => void;
+  onNotificationClick?: (notification: any) => void;
+  onClearNotification?: (id: string) => void;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
@@ -22,7 +24,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   isNotificationOpen,
   setIsNotificationOpen,
   onMarkAllRead,
-  onClearAll
+  onClearAll,
+  onNotificationClick,
+  onClearNotification
 }) => {
   const notificationRef = useRef<HTMLDivElement>(null);
 
@@ -80,6 +84,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             isOpen={isNotificationOpen}
             onMarkAllRead={onMarkAllRead}
             onClearAll={onClearAll}
+            onNotificationClick={onNotificationClick}
+            onClearNotification={onClearNotification}
           />
         </div>
 

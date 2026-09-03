@@ -89,3 +89,13 @@ def clear_all(db: Session = Depends(get_db), current_user: User = Depends(get_cu
     # Finalize deletion
     db.commit()
     return {"success": True}
+
+
+# DELETE endpoint to delete a specific single notification
+@router.delete("/{notification_id}")
+def delete_single_notification(notification_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    db.query(Notification).filter(
+        Notification.id == notification_id, Notification.user_id == current_user.id
+    ).delete()
+    db.commit()
+    return {"success": True}

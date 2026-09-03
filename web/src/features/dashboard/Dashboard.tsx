@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store';
-import { notificationsAPI } from '../../services/api';
+import { notificationsAPI, onboardingAPI } from '../../services/api';
 
 // Shell components
 import DashboardSidebar from './components/DashboardSidebar';
@@ -30,9 +30,10 @@ export const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Global Header Notifications State
+  // Global Header Notifications & Approvals State
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
 
   useEffect(() => {
     if (!user) {
@@ -41,8 +42,43 @@ export const Dashboard: React.FC = () => {
     }
     if (user.society_id) {
       notificationsAPI.list().then(setNotifications).catch(console.error);
+
+      if (user.role === 'admin' || user.resident_type === 'owner' || user.resident_type === 'renter') {
+        onboardingAPI
+          .pendingApprovals()
+          .then((list) => setPendingApprovalsCount(list.length))
+          .catch(console.error);
+      }
     }
-  }, [user, navigate]);
+  }, [user, navigate, activeTab]);
+
+  // Auto-clear tab notification count bubbles when opening that tab
+  useEffect(() => {
+    const tabTypeMap: Record<string, string[]> = {
+      billing: ['bill', 'payment_reminder'],
+      complaints: ['complaint'],
+      reimbursements: ['reimbursement'],
+      polls: ['poll'],
+      announcements: ['general'],
+    };
+
+    const matchingTypes = tabTypeMap[activeTab];
+    if (matchingTypes && notifications.length > 0) {
+      const unreadForTab = notifications.filter(
+        (n) => !n.is_read && matchingTypes.includes(n.notification_type)
+      );
+      if (unreadForTab.length > 0) {
+        unreadForTab.forEach((n) => notificationsAPI.markRead(n.id).catch(console.error));
+        setNotifications((prev) =>
+          prev.map((n) =>
+            !n.is_read && matchingTypes.includes(n.notification_type)
+              ? { ...n, is_read: true }
+              : n
+          )
+        );
+      }
+    }
+  }, [activeTab, notifications]);
 
   const handleLogoutClick = async () => {
     await logout();
@@ -68,6 +104,50 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const handleClearNotificationItem = async (id: string) => {
+    try {
+      await notificationsAPI.deleteSingle(id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleNotificationClick = async (notif: any) => {
+    try {
+      await notificationsAPI.deleteSingle(notif.id);
+      setNotifications((prev) => prev.filter((n) => n.id !== notif.id));
+    } catch (e) {
+      console.error(e);
+    }
+
+    setIsNotificationOpen(false);
+
+    const typeMap: Record<string, string> = {
+      bill: 'billing',
+      payment_reminder: 'billing',
+      complaint: 'complaints',
+      reimbursement: 'reimbursements',
+      poll: 'polls',
+      general: 'announcements',
+    };
+
+    const targetTab = typeMap[notif.notification_type] || 'dashboard';
+    setActiveTab(targetTab);
+  };
+
+  // Compute unread/pending notification bubble counts for sidebar tabs
+  const tabBadges: Record<string, number> = {
+    approvals: pendingApprovalsCount,
+    billing: notifications.filter(
+      (n) => !n.is_read && (n.notification_type === 'bill' || n.notification_type === 'payment_reminder')
+    ).length,
+    complaints: notifications.filter((n) => !n.is_read && n.notification_type === 'complaint').length,
+    reimbursements: notifications.filter((n) => !n.is_read && n.notification_type === 'reimbursement').length,
+    polls: notifications.filter((n) => !n.is_read && n.notification_type === 'poll').length,
+    announcements: notifications.filter((n) => !n.is_read && n.notification_type === 'general').length,
+  };
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
       {/* Sidebar */}
@@ -79,6 +159,7 @@ export const Dashboard: React.FC = () => {
         user={user}
         onLogout={handleLogoutClick}
         onResetSelections={() => {}}
+        tabBadges={tabBadges}
       />
 
       {/* Main Content Viewport */}
@@ -93,6 +174,8 @@ export const Dashboard: React.FC = () => {
           setIsNotificationOpen={setIsNotificationOpen}
           onMarkAllRead={handleMarkAllNotificationsRead}
           onClearAll={handleClearAllNotifications}
+          onNotificationClick={handleNotificationClick}
+          onClearNotification={handleClearNotificationItem}
         />
 
         {/* Dynamic Nested Feature Views */}

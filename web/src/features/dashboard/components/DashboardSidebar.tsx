@@ -14,6 +14,7 @@ interface DashboardSidebarProps {
   user: User | null;
   onLogout: () => void;
   onResetSelections: () => void;
+  tabBadges?: Record<string, number>;
 }
 
 export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
@@ -23,7 +24,8 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   setIsSidebarOpen,
   user,
   onLogout,
-  onResetSelections
+  onResetSelections,
+  tabBadges = {}
 }) => {
   const navItems = [
     { id: 'dashboard', icon: TrendingUp, label: 'Dashboard' },
@@ -77,20 +79,39 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         </div>
 
         <nav className="flex-1 py-6 px-3 space-y-1.5 overflow-y-auto">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavClick(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                activeTab === item.id ? 'bg-indigo-800 text-white' : 'text-indigo-200 hover:bg-indigo-800/60 hover:text-white'
-              }`}
-            >
-              <item.icon size={20} className="shrink-0" />
-              {(isSidebarOpen || (typeof window !== 'undefined' && window.innerWidth < 768)) && (
-                <span className="font-medium text-sm truncate">{item.label}</span>
-              )}
-            </button>
-          ))}
+          {navItems.map((item) => {
+            const badgeCount = tabBadges[item.id] || 0;
+            const isExpanded = isSidebarOpen || (typeof window !== 'undefined' && window.innerWidth < 768);
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavClick(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative ${
+                  activeTab === item.id ? 'bg-indigo-800 text-white' : 'text-indigo-200 hover:bg-indigo-800/60 hover:text-white'
+                }`}
+              >
+                <div className="relative shrink-0">
+                  <item.icon size={20} />
+                  {badgeCount > 0 && !isExpanded && (
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-indigo-900">
+                      {badgeCount > 9 ? '9+' : badgeCount}
+                    </span>
+                  )}
+                </div>
+                {isExpanded && (
+                  <>
+                    <span className="font-medium text-sm truncate flex-1 text-left">{item.label}</span>
+                    {badgeCount > 0 && (
+                      <span className="bg-rose-500 text-white font-bold text-[10px] px-2 py-0.5 rounded-full shadow-xs shrink-0">
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-indigo-800 space-y-1">

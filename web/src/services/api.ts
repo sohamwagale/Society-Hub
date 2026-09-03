@@ -362,6 +362,9 @@ export const notificationsAPI = {
   clearAll: async () => {
     await api.delete('/notifications/clear');
   },
+  deleteSingle: async (id: string) => {
+    await api.delete(`/notifications/${id}`);
+  },
 };
 
 export const announcementsAPI = {
