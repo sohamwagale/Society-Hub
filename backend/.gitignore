@@ -47,6 +47,7 @@ yarn-error.*
 /ios
 /android
 
+/uploads
 
 # keys
 my-society.json
