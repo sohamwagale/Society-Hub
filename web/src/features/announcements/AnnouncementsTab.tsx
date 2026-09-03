@@ -4,11 +4,14 @@ import type { Announcement } from '../../types';
 import { announcementsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import CreateAnnouncementModal from './components/CreateAnnouncementModal';
+import { toast } from '../../components/Toast';
+import { confirmDialog } from '../../components/ConfirmModal';
 
 export const AnnouncementsTab: React.FC = () => {
   const { user } = useAuthStore();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   // Form state
   const [annTitle, setAnnTitle] = useState('');
@@ -41,35 +44,47 @@ export const AnnouncementsTab: React.FC = () => {
         annFile || undefined
       );
 
-      alert('Announcement broadcasted!');
-      setIsModalOpen(false);
-      setAnnTitle('');
-      setAnnBody('');
-      setAnnPriority('normal');
-      setAnnFile(null);
-      loadAnnouncements();
+      setIsSuccess(true);
+      toast.success('Announcement broadcasted successfully!');
+      setTimeout(() => {
+        setIsSuccess(false);
+        setIsModalOpen(false);
+        setAnnTitle('');
+        setAnnBody('');
+        setAnnPriority('normal');
+        setAnnFile(null);
+        loadAnnouncements();
+      }, 1000);
     } catch (e) {
-      alert('Broadcast failure.');
+      toast.error('Failed to broadcast notice.');
     }
   };
 
   const handleTogglePinAnnouncement = async (id: string) => {
     try {
       await announcementsAPI.togglePin(id);
+      toast.success('Pin status toggled!');
       loadAnnouncements();
     } catch (e) {
-      console.error(e);
+      toast.error('Failed to toggle pin.');
     }
   };
 
-  const handleDeleteAnnouncement = async (id: string) => {
-    if (!window.confirm('Delete announcement?')) return;
-    try {
-      await announcementsAPI.delete(id);
-      loadAnnouncements();
-    } catch (e) {
-      console.error(e);
-    }
+  const handleDeleteAnnouncement = (id: string) => {
+    confirmDialog({
+      title: 'Delete Announcement?',
+      message: 'This announcement notice will be permanently removed from the notice board.',
+      confirmText: 'Delete Notice',
+      onConfirm: async () => {
+        try {
+          await announcementsAPI.delete(id);
+          toast.success('Announcement deleted!');
+          loadAnnouncements();
+        } catch (e) {
+          toast.error('Failed to delete announcement.');
+        }
+      },
+    });
   };
 
   return (
@@ -158,6 +173,7 @@ export const AnnouncementsTab: React.FC = () => {
 
       <CreateAnnouncementModal
         isOpen={isModalOpen}
+        isSuccess={isSuccess}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleBlastAnnouncement}
         title={annTitle}

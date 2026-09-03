@@ -130,7 +130,17 @@ export const Onboarding: React.FC = () => {
   };
 
   // If user is pending approval
-  if (user?.society_id && !user.is_approved_by_admin) {
+  if (user?.society_id && !user.is_fully_approved) {
+    const getPendingMessage = () => {
+      if (user.resident_type === 'owner_family' || user.resident_type === 'renter') {
+        return 'Your request to join the flat has been registered. Please contact the primary flat owner to approve your account.';
+      }
+      if (user.resident_type === 'renter_family') {
+        return 'Your request to join the flat has been registered. Please contact the primary tenant to approve your account.';
+      }
+      return 'Your request to join the society flat has been registered. Please contact the society committee administrator to approve your account.';
+    };
+
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -140,13 +150,13 @@ export const Onboarding: React.FC = () => {
             </div>
             <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Verification Pending</h2>
             <p className="mt-3 text-sm text-slate-500 leading-relaxed">
-              Your request to join the society flat has been registered. 
-              Please contact the society committee administrator to approve your account.
+              {getPendingMessage()}
             </p>
             <div className="mt-6 p-4 bg-slate-50 rounded-xl text-left text-xs text-slate-600 space-y-1.5 border border-slate-100">
               <p><strong>Name:</strong> {user.name}</p>
               <p><strong>Email:</strong> {user.email}</p>
               {user.flat_number && <p><strong>Flat:</strong> Flat {user.flat_number} ({user.block} Block)</p>}
+              {user.resident_type && <p><strong>Role:</strong> <span className="capitalize">{user.resident_type.replace('_', ' ')}</span></p>}
             </div>
 
             <div className="mt-8 space-y-3">
@@ -154,7 +164,7 @@ export const Onboarding: React.FC = () => {
                 onClick={() => refreshUser()}
                 className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
               >
-                Check Approval Status
+                Refresh Status
               </button>
               <button
                 onClick={handleLogout}
@@ -299,7 +309,9 @@ export const Onboarding: React.FC = () => {
               {/* Identity fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Aadhar Number (Optional)</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Aadhar Number{residentType === 'owner' ? '' : ' (Optional)'}
+                  </label>
                   <input
                     type="text"
                     maxLength={12}
@@ -310,7 +322,9 @@ export const Onboarding: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">PAN Card Number (Optional)</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    PAN Card Number{residentType === 'owner' ? '' : ' (Optional)'}
+                  </label>
                   <input
                     type="text"
                     maxLength={10}
@@ -403,9 +417,9 @@ export const Onboarding: React.FC = () => {
                       type="number"
                       min={1}
                       max={50}
-                      value={floorsCount}
-                      onChange={(e) => setFloorsCount(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      value={floorsCount || ''}
+                      onChange={(e) => setFloorsCount(e.target.value === '' ? 1 : Math.max(1, parseInt(e.target.value) || 1))}
+                      className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
                   <div>
@@ -414,9 +428,9 @@ export const Onboarding: React.FC = () => {
                       type="number"
                       min={1}
                       max={20}
-                      value={flatsPerFloor}
-                      onChange={(e) => setFlatsPerFloor(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      value={flatsPerFloor || ''}
+                      onChange={(e) => setFlatsPerFloor(e.target.value === '' ? 1 : Math.max(1, parseInt(e.target.value) || 1))}
+                      className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
                 </div>

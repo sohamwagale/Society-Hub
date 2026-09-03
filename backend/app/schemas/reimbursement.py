@@ -18,6 +18,8 @@ class ReimbursementCreate(BaseModel):
     expense_date: date
     # Classification category of the expense, defaults to 'other'
     category: str = "other"
+    # Optional payment address (UPI ID / Phone Number) provided by the user
+    payment_address: Optional[str] = None
 
 
 # Schema for updating an existing reimbursement request status or approved amount (Admin only)

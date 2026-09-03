@@ -77,13 +77,8 @@ def list_complaints(
     # Base query initialization
     query = db.query(Complaint)
 
-    # ── Role-Based Data Partitioning ──
-    if current_user.role.value != "admin":
-        # Residents only see their own filed complaints
-        query = query.filter(Complaint.user_id == current_user.id)
-    else:
-        # Admins see all complaints within their specific society
-        query = query.filter(Complaint.society_id == current_user.society_id)
+    # Filter all complaints belonging to the user's society
+    query = query.filter(Complaint.society_id == current_user.society_id)
 
     # Apply status filter if provided (e.g., show only 'resolved' issues)
     if status:
@@ -99,11 +94,11 @@ def list_complaints(
 
 # GET endpoint to fetch details of one specific complaint
 @router.get("/{complaint_id}", response_model=ComplaintOut)
-def get_complaint(complaint_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def get_complaint(complaint_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # retrieve complaint by ID
     complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
-    # error if missing
-    if not complaint:
+    # error if missing or outside society
+    if not complaint or complaint.society_id != current_user.society_id:
         raise HTTPException(status_code=404, detail="Complaint not found")
     return complaint
 
@@ -149,10 +144,10 @@ def update_complaint(
 
 # GET endpoint to fetch all messages/replies on a complaint
 @router.get("/{complaint_id}/comments", response_model=list[CommentOut])
-def list_comments(complaint_id: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def list_comments(complaint_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # verify parent complaint exists
     complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
-    if not complaint:
+    if not complaint or complaint.society_id != current_user.society_id:
         raise HTTPException(status_code=404, detail="Complaint record not found")
     
     # fetch chronologically
@@ -184,13 +179,8 @@ def add_comment(
 ):
     # verify target entity
     complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
-    if not complaint:
+    if not complaint or complaint.society_id != current_user.society_id:
         raise HTTPException(status_code=404, detail="Parent entity missing")
-
-    # ── Permission Logic ──
-    # Restrict communication to the complainant or the society administrator
-    if complaint.user_id != current_user.id and current_user.role.value != "admin":
-        raise HTTPException(status_code=403, detail="You do not have permission to join this discourse")
 
     # initialize the internal message record
     comment = ComplaintComment(

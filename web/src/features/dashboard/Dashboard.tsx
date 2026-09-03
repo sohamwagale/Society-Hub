@@ -109,7 +109,7 @@ export const Dashboard: React.FC = () => {
             {activeTab === 'polls' && <PollsTab />}
             {activeTab === 'emergency' && <EmergencyInfoTab />}
             {activeTab === 'flats' && user?.role === 'admin' && <FlatsTab />}
-            {activeTab === 'approvals' && user?.role === 'admin' && <ApprovalsTab />}
+            {activeTab === 'approvals' && (user?.role === 'admin' || user?.resident_type === 'owner' || user?.resident_type === 'renter') && <ApprovalsTab />}
             {activeTab === 'activity-log' && user?.role === 'admin' && <ActivityLogTab />}
             {activeTab === 'settings' && <SettingsTab />}
           </div>

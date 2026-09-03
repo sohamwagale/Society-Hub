@@ -3,10 +3,13 @@ import { Check, X } from 'lucide-react';
 import type { PendingUser } from '../../types';
 import { onboardingAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
+import { toast } from '../../components/Toast';
 
 export const ApprovalsTab: React.FC = () => {
   const { user } = useAuthStore();
   const [pendingApprovals, setPendingApprovals] = useState<PendingUser[]>([]);
+
+  const canViewApprovals = user?.role === 'admin' || user?.resident_type === 'owner' || user?.resident_type === 'renter';
 
   const loadApprovals = async () => {
     try {
@@ -18,36 +21,60 @@ export const ApprovalsTab: React.FC = () => {
   };
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (canViewApprovals) {
       loadApprovals();
     }
-  }, [user]);
+  }, [user, canViewApprovals]);
 
   const handleApprovePendingUser = async (id: string, approve: boolean) => {
     try {
       await onboardingAPI.approve(id, approve);
-      alert(approve ? 'User approved!' : 'Application rejected.');
+      toast.success(approve ? 'User approved!' : 'Application rejected.');
       loadApprovals();
     } catch (e) {
-      alert('Verification decision failed.');
+      toast.error('Verification decision failed.');
     }
   };
 
-  if (user?.role !== 'admin') return null;
+  if (!canViewApprovals) return null;
+
+  const getHeaderInfo = () => {
+    if (user?.role === 'admin') {
+      return {
+        title: 'Onboarding Verification Desk',
+        subtitle: 'Review pending resident flat assignments and approve/reject profiles.',
+        empty: 'Waiting room is empty. No pending onboarding registrations.'
+      };
+    }
+    if (user?.resident_type === 'owner') {
+      return {
+        title: 'Flat Member Approvals',
+        subtitle: 'Review pending requests from family members and tenants seeking to join your flat.',
+        empty: 'No pending join requests for your flat.'
+      };
+    }
+    return {
+      title: 'Family Member Approvals',
+      subtitle: 'Review pending requests from family members seeking to join your unit.',
+      empty: 'No pending family join requests for your unit.'
+    };
+  };
+
+  const headerInfo = getHeaderInfo();
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 font-sans">
       <div className="pb-4 border-b border-slate-100 mb-6">
-        <h3 className="font-bold text-slate-800 text-lg">Onboarding Verification Desk</h3>
+        <h3 className="font-bold text-slate-800 text-lg">{headerInfo.title}</h3>
         <p className="text-slate-500 text-xs mt-1">
-          Review pending resident flat assignments and approve/reject profiles.
+          {headerInfo.subtitle}
         </p>
       </div>
 
       <div className="space-y-4">
         {pendingApprovals.length === 0 ? (
           <p className="text-center text-slate-400 py-12 text-sm">
-            Waiting room is empty. No pending onboarding registrations.
+            {headerInfo.empty}
           </p>
         ) : (
           pendingApprovals.map((req) => (

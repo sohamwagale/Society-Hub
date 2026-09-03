@@ -429,12 +429,19 @@ export const societyAPI = {
   updateInfo: async (key: string, value: string) => {
     await api.put('/society/info', { key, value });
   },
+  deleteInfo: async (key: string) => {
+    await api.delete(`/society/info/${key}`);
+  },
   getEmergencyContacts: async (): Promise<EmergencyContact[]> => {
     const { data } = await api.get<EmergencyContact[]>('/society/emergency-contacts');
     return data;
   },
   createEmergencyContact: async (contact: { name: string; phone: string; role: string }): Promise<EmergencyContact> => {
     const { data } = await api.post<EmergencyContact>('/society/emergency-contacts', contact);
+    return data;
+  },
+  updateEmergencyContact: async (id: string, contact: { name: string; phone: string; role: string }): Promise<EmergencyContact> => {
+    const { data } = await api.put<EmergencyContact>(`/society/emergency-contacts/${id}`, contact);
     return data;
   },
   deleteEmergencyContact: async (id: string) => {

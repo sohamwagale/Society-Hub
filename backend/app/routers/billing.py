@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 # Import the database session utility
 from app.database import get_db
 # Import core models for billing, payments, and associations
-from app.models.user import User
+from app.models.user import User, ResidentType
+from app.models.flat import Flat
 from app.models.billing import Bill, BillPayment, BillType, BillStatus, BillFlatAmount
 # Import Pydantic schemas for data validation
 from app.schemas.billing import BillCreate, BillOut, BillUpdate, BillPaymentCreate, BillPaymentOut
@@ -682,62 +683,67 @@ def get_bill_residents(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
-    """Retrieves a granular list of all society residents and matches them with their payment status for a specific bill."""
-    # check bill existence
+    """Retrieves a list of all society flats and matches them with their payment status for a specific bill."""
     bill = db.query(Bill).filter(Bill.id == bill_id).first()
     if not bill:
         raise HTTPException(status_code=404, detail="Bill record not found")
 
-    # Fetch all active residents in the society
-    residents_query = db.query(User).filter(User.role == "resident")
-    if bill.society_id:
-        residents_query = residents_query.filter(User.society_id == bill.society_id)
-    users = [u for u in residents_query.all() if u.is_fully_approved]
-    
-    # Retrieve all payments recorded for this bill across the entire society
+    # Fetch all physical flats in the society
+    flats = (
+        db.query(Flat)
+        .filter(Flat.society_id == bill.society_id)
+        .order_by(Flat.block, Flat.flat_number)
+        .all()
+    )
+
+    # Retrieve all payments recorded for this bill
     payments = db.query(BillPayment).filter(BillPayment.bill_id == bill_id).all()
-    # set of IDs who paid
     paid_user_ids = {p.user_id for p in payments}
 
-    # identify all flat IDs that are considered "Paid"
+    # Identify all flat IDs that are considered "Paid"
     paid_flat_ids = set()
     for user in db.query(User).filter(User.id.in_(paid_user_ids)).all():
         if user.flat_id:
             paid_flat_ids.add(user.flat_id)
 
-    # build resident list with status maps
     results = []
-    for user in users:
-        # check specific override for this resident
-        actual_amount = _get_resident_bill_amount(bill, user, db)
-        # skip if resident is excluded (amount 0)
-        if actual_amount == 0:
+    for flat in flats:
+        # Only include flats that have settled this bill (one entry of payment per flat)
+        is_paid = flat.id in paid_flat_ids
+        if not is_paid:
             continue
-            
-        # check if this user or their flatmate settled the bill
-        is_paid = (user.id in paid_user_ids) or (user.flat_id in paid_flat_ids)
-        
-        # Determine the precise payment timestamp for display
-        paid_at = None
-        if is_paid:
-            # find all users in the same household
-            flat_users = [u.id for u in db.query(User).filter(User.flat_id == user.flat_id).all()] if user.flat_id else [user.id]
-            # locate the actual payment record made by any of them
-            flat_payment = db.query(BillPayment).filter(BillPayment.bill_id == bill_id, BillPayment.user_id.in_(flat_users)).first()
-            if flat_payment:
-                paid_at = flat_payment.paid_at
 
-        # Construct flat-resident status object
+        # Find primary owner or active resident in this flat
+        owner = next(
+            (u for u in flat.residents if u.resident_type == ResidentType.OWNER and u.is_fully_approved),
+            None,
+        )
+        if not owner:
+            owner = next((u for u in flat.residents if u.is_fully_approved), None)
+
+        actual_amount = _get_resident_bill_amount(bill, owner, db) if owner else bill.amount
+        if owner and actual_amount == 0:
+            continue
+
+        flat_user_ids = [u.id for u in flat.residents]
+        flat_payment = (
+            db.query(BillPayment)
+            .filter(BillPayment.bill_id == bill_id, BillPayment.user_id.in_(flat_user_ids))
+            .first()
+        )
+        paid_at = flat_payment.paid_at if flat_payment else None
+        paid_by_user = flat_payment.user if (flat_payment and flat_payment.user) else owner
+        occupant_name = paid_by_user.name if paid_by_user else "Vacant / Unassigned"
+
         results.append({
-            "user_id": user.id,
-            "name": user.name,
-            "flat": f"{user.flat.block}-{user.flat.flat_number}" if user.flat else "Standalone",
-            "status": "paid" if is_paid else "due",
+            "user_id": flat.id,
+            "name": occupant_name,
+            "flat": f"{flat.block}-{flat.flat_number}",
+            "status": "paid",
             "paid_at": paid_at,
-            "amount": actual_amount
+            "amount": actual_amount,
         })
-    
-    # Return the unified resident status list
+
     return results
 
 
@@ -970,193 +976,225 @@ def download_receipt(
     c = pdf_canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # Define premium colors for the receipt
-    primary = HexColor("#311B92")  # Deep Indigo
-    accent = HexColor("#7C4DFF")
-    dark_bg = HexColor("#0F0F1A")
-    text_dark = HexColor("#1A1A2E")
-    text_light = HexColor("#555555")
-    border = HexColor("#E0E0E0")
+    # ── Color Palette ──
+    brand_primary = HexColor("#1E1B4B")   # Indigo 950
+    brand_accent = HexColor("#4F46E5")    # Indigo 600
+    brand_light = HexColor("#EEF2FF")     # Indigo 50
+    text_main = HexColor("#0F172A")       # Slate 900
+    text_muted = HexColor("#64748B")      # Slate 500
+    card_bg = HexColor("#F8FAFC")         # Slate 50
+    border_color = HexColor("#E2E8F0")    # Slate 200
+    success_bg = HexColor("#DCFCE7")      # Emerald 100
+    success_text = HexColor("#166534")    # Emerald 800
 
-    # ── PDF Header Visuals ──
-    # Top branding bar
-    c.setFillColor(primary)
-    c.rect(0, height - 100, width, 100, fill=True, stroke=False)
-
-    # Society Brand Identity
-    c.setFillColor(HexColor("#FFFFFF"))
-    c.setFont("Helvetica-Bold", 22)
-    c.drawString(30, height - 45, society_name.upper())
-    # Society Contact / Address
-    if society_address:
-        c.setFont("Helvetica", 10)
-        c.drawString(30, height - 62, society_address)
-    
-    # Document Identification
-    c.setFont("Helvetica-Bold", 14)
-    c.drawRightString(width - 30, height - 45, "OFFICIAL PAYMENT RECEIPT")
-
-    # Meta markers: Receipt # and Generation Date
     receipt_no = f"SH-{payment.id[:8].upper()}"
-    c.setFont("Helvetica", 9)
-    c.drawRightString(width - 30, height - 62, f"Serial #: {receipt_no}")
-    c.drawRightString(width - 30, height - 75, f"Issued: {payment.paid_at.strftime('%d %b %Y, %I:%M %p')}")
 
-    # Vertical offset start
-    y = height - 140
+    # ── 1. Top Header Banner ──
+    c.setFillColor(brand_primary)
+    c.roundRect(36, height - 120, width - 72, 85, 10, fill=True, stroke=False)
 
-    # ── Bill & Transaction Details ──
-    c.setFillColor(text_dark)
-    c.setFont("Helvetica-Bold", 13)
-    c.drawString(30, y, "Summary of Transaction")
-    y -= 5
-    # Bottom underline for header
-    c.setStrokeColor(primary)
-    c.setLineWidth(1)
-    c.line(30, y, 180, y)
-    y -= 25
+    # Accent Stripe
+    c.setFillColor(brand_accent)
+    c.roundRect(36, height - 120, 6, 85, 3, fill=True, stroke=False)
 
-    # Define detail labels
-    details = [
-        ("Description of Bill", bill.title),
-        ("Billing Period / Type", (bill.bill_type.value if bill.bill_type else "Maintenance").title()),
-        ("Paid by Account", current_user.name),
-        ("Unit Identification", f"{current_user.flat.block}-{current_user.flat.flat_number}" if current_user.flat else "Standalone"),
-        ("Transaction Reference", payment.transaction_ref or "Bank Transfer"),
-        ("Payment Frequency", "One-time Settlement")
-    ]
+    # Header Left: Society Identity
+    c.setFillColor(HexColor("#FFFFFF"))
+    c.setFont("Helvetica-Bold", 17)
+    c.drawString(55, height - 60, society_name.upper()[:32])
 
-    # Render detail table in the PDF
-    for label, val in details:
-        c.setFont("Helvetica-Bold", 10)
-        c.setFillColor(text_light)
-        c.drawString(30, y, label)
-        c.setFont("Helvetica", 10)
-        c.setFillColor(text_dark)
-        c.drawString(200, y, str(val))
-        y -= 20
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(HexColor("#A5B4FC"))
+    c.drawString(55, height - 74, "SOCIETY MANAGEMENT SYSTEM")
 
-    y -= 10
-    # ── Financial Breakdown ──
-    # Create a highlighted box for the final amount
-    c.setFillColor(HexColor("#F9F9FB"))
-    c.rect(30, y - 50, width - 60, 60, fill=True, stroke=False)
-    
-    total_y = y - 30
-    c.setFillColor(primary)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(30 + 15, total_y, "TOTAL AMOUNT SETTLED")
-    
-    c.setFont("Helvetica-Bold", 18)
-    # Currency symbol and formatted value
-    c.drawRightString(width - 30 - 15, total_y - 2, f"₹ {payment.amount:,.2f}")
-    
-    y -= 80
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(HexColor("#CBD5E1"))
+    c.drawString(55, height - 90, society_address[:55] if society_address else "")
 
-    # ── Security & Validation Sign-off ──
-    c.setFillColor(text_dark)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(30, y, "Verification Status:")
-    c.setFillColor(HexColor("#2E7D32")) # Success Green
-    c.drawString(135, y, "✔ ELECTRONICALLY VERIFIED")
-    
-    y -= 30
-    c.setFillColor(text_light)
-    c.setFont("Helvetica-Oblique", 9)
-    # Disclaimer for digital validity
-    c.drawString(30, y, "This is a computer-generated document. No physical signature is required under the IT Act.")
-
-    y -= 100
-    # ── Branding Footer ──
-    c.setStrokeColor(border)
-    c.line(30, y, width - 30, y)
-    y -= 20
+    # Header Right: Receipt Tag
     c.setFont("Helvetica-Bold", 12)
-    c.setFillColor(primary)
-    c.drawCentredString(width / 2, y, "THANK YOU FOR USING SOCIETY HUB")
-    
-    # ── PDF Completion ──
-    c.save()
-    buffer.seek(0)
+    c.setFillColor(HexColor("#FFFFFF"))
+    c.drawRightString(width - 55, height - 58, "PAYMENT RECEIPT")
 
-    # Return the PDF file result
-    return StreamingResponse(
-        buffer,
-        media_type="application/pdf",
-        # Force a generic descriptive filename
-        headers={"Content-Disposition": f'attachment; filename="Receipt_{payment_id[:8]}.pdf"'},
-    )
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColor(HexColor("#C7D2FE"))
+    c.drawRightString(width - 55, height - 74, f"Receipt No: {receipt_no}")
 
-    c.setStrokeColor(border)
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(HexColor("#E2E8F0"))
+    c.drawRightString(width - 55, height - 90, f"Issued: {payment.paid_at.strftime('%d %b %Y, %I:%M %p')}")
+
+    # ── 2. Payment Verified Badge ──
+    y = height - 150
+    c.setFillColor(success_bg)
+    c.setStrokeColor(HexColor("#86EFAC"))
+    c.setLineWidth(1)
+    c.roundRect(36, y - 5, 175, 24, 6, fill=True, stroke=True)
+
+    c.setFillColor(success_text)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(50, y + 2, "✔ PAYMENT VERIFIED & PAID")
+
+    # ── 3. Two-Column Metadata Cards ──
+    card_top = y - 40
+    card_h = 100
+
+    # Card 1 (Left): Resident Details
+    c.setFillColor(card_bg)
+    c.setStrokeColor(border_color)
+    c.setLineWidth(1)
+    c.roundRect(36, card_top - card_h, 250, card_h, 8, fill=True, stroke=True)
+
+    c.setFillColor(HexColor("#475569"))
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(50, card_top - 18, "BILLED TO / RESIDENT DETAILS")
+
+    c.setStrokeColor(HexColor("#CBD5E1"))
     c.setLineWidth(0.5)
-    c.line(30, y, width - 30, y)
-    y -= 22
+    c.line(50, card_top - 23, 270, card_top - 23)
 
-    details = [
-        ("Bill Title", bill.title),
-        ("Bill Type", bill.bill_type.value.replace("_", " ").title() if bill.bill_type else "-"),
-        ("Description", bill.description or "—"),
-        ("Due Date", bill.due_date.strftime("%d %b %Y") if bill.due_date else "-"),
-    ]
+    flat_str = f"Block {current_user.flat.block} - Flat {current_user.flat.flat_number}" if current_user.flat else "Standalone Unit"
 
-    for label, value in details:
-        c.setFont("Helvetica", 10)
-        c.setFillColor(text_light)
-        c.drawString(30, y, label)
-        c.setFillColor(text_dark)
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(180, y, str(value))
-        y -= 20
+    c.setFont("Helvetica-Bold", 9.5)
+    c.setFillColor(text_main)
+    c.drawString(50, card_top - 38, current_user.name[:30])
+
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(text_muted)
+    c.drawString(50, card_top - 54, f"Unit: {flat_str}")
+    c.drawString(50, card_top - 68, f"Email: {current_user.email[:30]}")
+    if hasattr(current_user, 'phone') and current_user.phone:
+        c.drawString(50, card_top - 82, f"Phone: {current_user.phone}")
+
+    # Card 2 (Right): Payment Details
+    c.setFillColor(card_bg)
+    c.setStrokeColor(border_color)
+    c.setLineWidth(1)
+    c.roundRect(300, card_top - card_h, width - 336, card_h, 8, fill=True, stroke=True)
+
+    c.setFillColor(HexColor("#475569"))
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(314, card_top - 18, "TRANSACTION INFORMATION")
+
+    c.setStrokeColor(HexColor("#CBD5E1"))
+    c.setLineWidth(0.5)
+    c.line(314, card_top - 23, width - 50, card_top - 23)
+
+    method_str = (payment.payment_method or "Online Settlement").replace("_", " ").title()
+    ref_str = payment.transaction_ref or "Bank Transfer Ref"
+
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(text_muted)
+    c.drawString(314, card_top - 38, "Transaction Ref:")
+    c.setFont("Helvetica-Bold", 8.5)
+    c.setFillColor(text_main)
+    c.drawString(395, card_top - 38, ref_str[:22])
+
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(text_muted)
+    c.drawString(314, card_top - 54, "Payment Method:")
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(text_main)
+    c.drawString(395, card_top - 54, method_str)
+
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(text_muted)
+    c.drawString(314, card_top - 68, "Payment Date:")
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(text_main)
+    c.drawString(395, card_top - 68, payment.paid_at.strftime('%d %b %Y, %I:%M %p'))
+
+    # ── 4. Itemized Summary Table ──
+    table_top = card_top - card_h - 30
+    c.setFillColor(text_main)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(36, table_top, "Itemized Charge Details")
+
+    # Table Header
+    y = table_top - 20
+    c.setFillColor(HexColor("#F1F5F9"))
+    c.roundRect(36, y - 5, width - 72, 22, 4, fill=True, stroke=False)
+
+    c.setFillColor(HexColor("#334155"))
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(50, y + 2, "BILL TITLE & DESCRIPTION")
+    c.drawString(314, y + 2, "BILL TYPE")
+    c.drawRightString(width - 50, y + 2, "AMOUNT (Rs.)")
+
+    # Table Data Row
+    y -= 25
+    c.setFont("Helvetica-Bold", 9.5)
+    c.setFillColor(text_main)
+    c.drawString(50, y, bill.title[:38])
+
+    b_type = (bill.bill_type.value if bill.bill_type else "Maintenance").replace("_", " ").title()
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(text_muted)
+    c.drawString(314, y, b_type)
+
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(text_main)
+    c.drawRightString(width - 50, y, f"Rs. {payment.amount:,.2f}")
+
+    if bill.description:
+        y -= 14
+        c.setFont("Helvetica-Oblique", 8)
+        c.setFillColor(text_muted)
+        c.drawString(50, y, bill.description[:70])
 
     y -= 15
+    c.setStrokeColor(border_color)
+    c.setLineWidth(1)
+    c.line(36, y, width - 36, y)
 
-    # Payment Details section
-    c.setFillColor(text_dark)
-    c.setFont("Helvetica-Bold", 13)
-    c.drawString(30, y, "Payment Details")
-    y -= 5
-    c.line(30, y, width - 30, y)
-    y -= 22
+    # ── 5. Total Settlement Highlight Box ──
+    y -= 60
+    c.setFillColor(brand_light)
+    c.setStrokeColor(HexColor("#C7D2FE"))
+    c.setLineWidth(1.5)
+    c.roundRect(36, y, width - 72, 48, 8, fill=True, stroke=True)
 
-    payment_details = [
-        ("Paid By", current_user.name),
-        ("Email", current_user.email),
-        ("Amount Paid", f"Rs.{payment.amount:,.2f}"),
-        ("Payment Method", (payment.payment_method or "—").replace("_", " ").title()),
-        ("Transaction Ref", payment.transaction_ref or "—"),
-        ("Payment Date", payment.paid_at.strftime("%d %b %Y, %I:%M %p")),
-    ]
+    c.setFillColor(HexColor("#3730A3"))
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(52, y + 26, "TOTAL AMOUNT PAID")
 
-    for label, value in payment_details:
-        c.setFont("Helvetica", 10)
-        c.setFillColor(text_light)
-        c.drawString(30, y, label)
-        c.setFillColor(text_dark)
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(180, y, str(value))
-        y -= 20
-
-    # Amount box
-    y -= 15
-    c.setFillColor(HexColor("#F3E5F5"))
-    c.roundRect(30, y - 30, width - 60, 45, 8, fill=True, stroke=False)
-    c.setFillColor(primary)
-    c.setFont("Helvetica-Bold", 18)
-    c.drawCentredString(width / 2, y - 15, f"Total Paid: Rs.{payment.amount:,.2f}")
-
-    # Footer
-    c.setFillColor(text_light)
     c.setFont("Helvetica", 8)
-    c.drawCentredString(width / 2, 40, f"This is a computer-generated receipt. Receipt ID: {receipt_no}")
-    c.drawCentredString(width / 2, 28, f"Generated on {datetime.utcnow().strftime('%d %b %Y at %I:%M %p UTC')}")
+    c.setFillColor(brand_accent)
+    c.drawString(52, y + 12, "Payment settled electronically in full")
 
+    c.setFillColor(brand_primary)
+    c.setFont("Helvetica-Bold", 18)
+    c.drawRightString(width - 52, y + 16, f"Rs. {payment.amount:,.2f}")
+
+    # ── 6. Digital Verification & Footer ──
+    c.setFillColor(card_bg)
+    c.setStrokeColor(border_color)
+    c.setLineWidth(1)
+    c.roundRect(36, 70, width - 72, 38, 6, fill=True, stroke=True)
+
+    c.setFillColor(HexColor("#475569"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(width / 2, 94, "AUTHENTIC & DIGITALLY VERIFIED RECEIPT")
+
+    c.setFont("Helvetica", 7.5)
+    c.setFillColor(text_muted)
+    c.drawCentredString(width / 2, 81, "This document is computer-generated under the Information Technology Act. No physical signature is required.")
+
+    c.setStrokeColor(HexColor("#CBD5E1"))
+    c.setLineWidth(0.5)
+    c.line(36, 50, width - 36, 50)
+
+    c.setFillColor(brand_accent)
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawCentredString(width / 2, 36, "Thank you for being a valued resident! • SocietyHub System")
+
+    # ── Save PDF Canvas ──
     c.save()
     buffer.seek(0)
 
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="receipt_{receipt_no}.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="Receipt_{receipt_no}.pdf"'},
     )
 
 # ---------------------------------------------------------------------------

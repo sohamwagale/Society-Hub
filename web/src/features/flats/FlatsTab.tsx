@@ -5,32 +5,35 @@ import { flatsAPI, residentsAPI, onboardingAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import CreateFlatModal from './components/CreateFlatModal';
 import AssignResidentModal from './components/AssignResidentModal';
+import { toast } from '../../components/Toast';
+import { confirmDialog } from '../../components/ConfirmModal';
 
 export const FlatsTab: React.FC = () => {
   const { user } = useAuthStore();
   const [flats, setFlats] = useState<Flat[]>([]);
-  const [residents, setResidents] = useState<ResidentInfo[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<PendingUser[]>([]);
-  const [flatSearch, setFlatSearch] = useState('');
-
-  // Modals & sub-state
+  const [activeResidents, setActiveResidents] = useState<ResidentInfo[]>([]);
   const [modalType, setModalType] = useState<string | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  // Form State
   const [newFlatNumber, setNewFlatNumber] = useState('');
   const [newFlatBlock, setNewFlatBlock] = useState('');
   const [newFlatFloor, setNewFlatFloor] = useState('');
   const [selectedFlatForAssign, setSelectedFlatForAssign] = useState<Flat | null>(null);
   const [residentAssignSearch, setResidentAssignSearch] = useState('');
+  const [flatSearch, setFlatSearch] = useState('');
 
   const loadData = async () => {
     try {
-      const [resFlats, resList, queue] = await Promise.all([
+      const [flatsData, pending, residents] = await Promise.all([
         flatsAPI.list(),
+        onboardingAPI.pendingApprovals(),
         residentsAPI.list(),
-        user?.role === 'admin' ? onboardingAPI.pendingApprovals() : Promise.resolve([])
       ]);
-      setFlats(resFlats.sort((a, b) => a.flat_number.localeCompare(b.flat_number)));
-      setResidents(resList);
-      setPendingApprovals(queue);
+      setFlats(flatsData.sort((a, b) => a.flat_number.localeCompare(b.flat_number)));
+      setPendingApprovals(pending);
+      setActiveResidents(residents);
     } catch (e) {
       console.error(e);
     }
@@ -43,10 +46,10 @@ export const FlatsTab: React.FC = () => {
   const handleApprovePendingUser = async (id: string, approve: boolean) => {
     try {
       await onboardingAPI.approve(id, approve);
-      alert(approve ? 'User approved!' : 'Application rejected.');
+      toast.success(approve ? 'User approved!' : 'Application rejected.');
       loadData();
     } catch (e) {
-      alert('Verification decision failed.');
+      toast.error('Verification decision failed.');
     }
   };
 
@@ -55,13 +58,18 @@ export const FlatsTab: React.FC = () => {
     if (!newFlatNumber || !newFlatBlock || !newFlatFloor) return;
     try {
       await flatsAPI.create({ flat_number: newFlatNumber, block: newFlatBlock, floor: newFlatFloor });
-      setModalType(null);
-      setNewFlatNumber('');
-      setNewFlatBlock('');
-      setNewFlatFloor('');
-      loadData();
+      setIsSuccess(true);
+      toast.success('Flat unit registered!');
+      setTimeout(() => {
+        setIsSuccess(false);
+        setModalType(null);
+        setNewFlatNumber('');
+        setNewFlatBlock('');
+        setNewFlatFloor('');
+        loadData();
+      }, 1000);
     } catch (e) {
-      alert('Failed to register flat.');
+      toast.error('Failed to register flat.');
     }
   };
 
@@ -69,27 +77,31 @@ export const FlatsTab: React.FC = () => {
     if (!selectedFlatForAssign) return;
     try {
       await flatsAPI.assignUser(residentId, selectedFlatForAssign.id);
-      alert('Resident linked successfully!');
+      toast.success('Resident linked successfully!');
       setModalType(null);
       setSelectedFlatForAssign(null);
       setResidentAssignSearch('');
       loadData();
     } catch (e) {
-      alert('Failed to assign resident.');
+      toast.error('Failed to assign resident.');
     }
   };
 
-  const handleVacateFlat = async (flat: Flat) => {
-    const resident = residents.find((r) => r.flat_id === flat.id);
-    if (!resident) return;
-    if (!window.confirm(`Are you sure you want to vacate ${resident.name} from Flat ${flat.flat_number}?`)) return;
-    try {
-      await flatsAPI.assignUser(resident.id, null);
-      alert('Flat vacated successfully!');
-      loadData();
-    } catch (e) {
-      alert('Failed to vacate flat.');
-    }
+  const handleVacateResident = (resident: ResidentInfo, flatNumber: string) => {
+    confirmDialog({
+      title: 'Unlink Resident Asset?',
+      message: `Are you sure you want to unlink ${resident.name} from Flat ${flatNumber}?`,
+      confirmText: 'Unlink Resident',
+      onConfirm: async () => {
+        try {
+          await flatsAPI.assignUser(resident.id, null);
+          toast.success('Resident unlinked successfully!');
+          loadData();
+        } catch (e) {
+          toast.error('Failed to unlink resident.');
+        }
+      },
+    });
   };
 
   const filteredFlats = flats.filter(
@@ -97,8 +109,6 @@ export const FlatsTab: React.FC = () => {
       f.flat_number.toLowerCase().includes(flatSearch.toLowerCase()) ||
       f.block.toLowerCase().includes(flatSearch.toLowerCase())
   );
-
-  const getResidentForFlat = (flatId: string) => residents.find((r) => r.flat_id === flatId);
 
   if (user?.role !== 'admin') return null;
 
@@ -152,7 +162,7 @@ export const FlatsTab: React.FC = () => {
           <div>
             <h3 className="font-bold text-slate-800 text-lg">Physical Units Inventory</h3>
             <p className="text-slate-500 text-xs mt-1">
-              Manage physical society apartments and assign verified resident occupants.
+              Physical society apartments automatically mapped from resident onboarding.
             </p>
           </div>
           <div className="flex gap-3">
@@ -177,46 +187,52 @@ export const FlatsTab: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredFlats.map((flat) => {
-            const resident = getResidentForFlat(flat.id);
+            const flatResidents = activeResidents.filter((r) => r.flat_id === flat.id);
             return (
               <div
                 key={flat.id}
-                className="p-4 bg-slate-50 border border-slate-100 hover:border-slate-300 rounded-xl flex items-center justify-between transition-all"
+                className="p-4 bg-slate-50 border border-slate-100 hover:border-slate-300 rounded-xl flex flex-col justify-between transition-all space-y-3"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-indigo-50 text-indigo-700 rounded-xl flex items-center justify-center font-bold text-base border border-indigo-100">
-                    {flat.flat_number}
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">
-                      Block {flat.block} • Floor {flat.floor}
-                    </p>
-                    {resident ? (
-                      <p className="text-emerald-700 font-bold text-xs mt-0.5">{resident.name}</p>
-                    ) : (
-                      <p className="text-red-500 font-bold text-[10px] mt-0.5">Vacant / Unassigned</p>
-                    )}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-50 text-indigo-700 rounded-xl flex items-center justify-center font-bold text-base border border-indigo-100">
+                      {flat.flat_number}
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">
+                        Block {flat.block} • Floor {flat.floor}
+                      </p>
+                      <p className="text-xs font-semibold text-slate-700">
+                        {flatResidents.length} {flatResidents.length === 1 ? 'Occupant' : 'Occupants'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  {resident ? (
-                    <button
-                      onClick={() => handleVacateFlat(flat)}
-                      className="border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold px-2.5 py-1.5 rounded transition-colors"
-                    >
-                      Vacate
-                    </button>
+                <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
+                  {flatResidents.length === 0 ? (
+                    <p className="text-slate-400 font-medium text-[11px] py-1 italic">
+                      Vacant / Unassigned (Awaiting Onboarding)
+                    </p>
                   ) : (
-                    <button
-                      onClick={() => {
-                        setSelectedFlatForAssign(flat);
-                        setModalType('assign_flat');
-                      }}
-                      className="border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-2.5 py-1.5 rounded transition-colors"
-                    >
-                      Assign
-                    </button>
+                    flatResidents.map((res) => (
+                      <div key={res.id} className="flex items-center justify-between text-xs py-0.5">
+                        <div className="truncate max-w-[170px]">
+                          <span className="font-bold text-slate-800">{res.name}</span>
+                          {res.resident_type && (
+                            <span className="ml-1.5 text-[9px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded capitalize">
+                              {res.resident_type.replace('_', ' ')}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleVacateResident(res, flat.flat_number)}
+                          className="text-[10px] text-red-600 hover:text-red-700 font-semibold hover:underline"
+                        >
+                          Unlink
+                        </button>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
@@ -227,6 +243,7 @@ export const FlatsTab: React.FC = () => {
 
       <CreateFlatModal
         isOpen={modalType === 'create_flat'}
+        isSuccess={isSuccess}
         onClose={() => setModalType(null)}
         onSubmit={handleCreateFlatSubmit}
         newFlatNumber={newFlatNumber}
@@ -241,7 +258,7 @@ export const FlatsTab: React.FC = () => {
         isOpen={modalType === 'assign_flat'}
         onClose={() => setModalType(null)}
         selectedFlat={selectedFlatForAssign}
-        residents={residents}
+        residents={activeResidents}
         residentAssignSearch={residentAssignSearch}
         setResidentAssignSearch={setResidentAssignSearch}
         onAssignResident={handleAssignResident}

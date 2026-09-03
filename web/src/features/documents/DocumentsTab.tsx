@@ -4,11 +4,14 @@ import type { SocietyDocument } from '../../types';
 import { documentsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import UploadDocumentModal from './components/UploadDocumentModal';
+import { toast } from '../../components/Toast';
+import { confirmDialog } from '../../components/ConfirmModal';
 
 export const DocumentsTab: React.FC = () => {
   const { user } = useAuthStore();
   const [documents, setDocuments] = useState<SocietyDocument[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   // Form State
   const [docTitle, setDocTitle] = useState('');
@@ -33,34 +36,46 @@ export const DocumentsTab: React.FC = () => {
     if (!docFile) return;
     try {
       await documentsAPI.upload(docTitle, docFile, docDesc);
-      alert('Document submitted successfully!');
-      setIsModalOpen(false);
-      setDocTitle('');
-      setDocDesc('');
-      setDocFile(null);
-      loadDocuments();
+      setIsSuccess(true);
+      toast.success('Document uploaded successfully!');
+      setTimeout(() => {
+        setIsSuccess(false);
+        setIsModalOpen(false);
+        setDocTitle('');
+        setDocDesc('');
+        setDocFile(null);
+        loadDocuments();
+      }, 1000);
     } catch (e) {
-      alert('Failed to upload document.');
+      toast.error('Failed to upload document.');
     }
   };
 
   const handleApproveDocument = async (id: string) => {
     try {
       await documentsAPI.approve(id);
+      toast.success('Document approved!');
       loadDocuments();
     } catch (e) {
-      alert('Failed to approve document.');
+      toast.error('Failed to approve document.');
     }
   };
 
-  const handleDeleteDocument = async (id: string) => {
-    if (!window.confirm('Delete this document?')) return;
-    try {
-      await documentsAPI.delete(id);
-      loadDocuments();
-    } catch (e) {
-      alert('Failed to delete document.');
-    }
+  const handleDeleteDocument = (id: string) => {
+    confirmDialog({
+      title: 'Delete Document File?',
+      message: 'Are you sure you want to delete this document from the vault?',
+      confirmText: 'Delete Document',
+      onConfirm: async () => {
+        try {
+          await documentsAPI.delete(id);
+          toast.success('Document deleted!');
+          loadDocuments();
+        } catch (e) {
+          toast.error('Failed to delete document.');
+        }
+      },
+    });
   };
 
   return (
@@ -147,6 +162,7 @@ export const DocumentsTab: React.FC = () => {
 
       <UploadDocumentModal
         isOpen={isModalOpen}
+        isSuccess={isSuccess}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleUploadDocument}
         docTitle={docTitle}

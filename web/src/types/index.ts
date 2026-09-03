@@ -199,6 +199,7 @@ export interface ReimbursementCreate {
   amount: number;
   expense_date: string;
   category: ReimbursementCategory;
+  payment_address?: string;
 }
 
 export type NotificationType = 'bill' | 'payment_reminder' | 'complaint' | 'poll' | 'reimbursement' | 'general';
@@ -243,6 +244,7 @@ export interface ResidentInfo {
   phone?: string;
   role: string;
   flat_id?: string;
+  resident_type?: ResidentType;
   flat_number?: string;
   block?: string;
   floor?: string;

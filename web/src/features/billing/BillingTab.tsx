@@ -6,6 +6,8 @@ import { useAuthStore } from '../../store';
 import CreateBillModal from './components/CreateBillModal';
 import UploadReceiptModal from './components/UploadReceiptModal';
 import PaymentSuccessModal from './components/PaymentSuccessModal';
+import { toast } from '../../components/Toast';
+import { confirmDialog } from '../../components/ConfirmModal';
 
 export const BillingTab: React.FC = () => {
   const { user } = useAuthStore();
@@ -17,6 +19,7 @@ export const BillingTab: React.FC = () => {
 
   // Modals & sub-state
   const [modalType, setModalType] = useState<string | null>(null);
+  const [isCreateBillSuccess, setIsCreateBillSuccess] = useState(false);
   const [newBill, setNewBill] = useState<BillCreate>({
     title: '',
     description: '',
@@ -73,22 +76,34 @@ export const BillingTab: React.FC = () => {
     e.preventDefault();
     try {
       await billsAPI.create(newBill);
-      setModalType(null);
-      setNewBill({ title: '', description: '', amount: 0, due_date: '', bill_type: 'maintenance' });
-      loadBillingData();
+      setIsCreateBillSuccess(true);
+      toast.success('Billing cycle generated successfully!');
+      setTimeout(() => {
+        setIsCreateBillSuccess(false);
+        setModalType(null);
+        setNewBill({ title: '', description: '', amount: 0, due_date: '', bill_type: 'maintenance' });
+        loadBillingData();
+      }, 1000);
     } catch (e) {
-      alert('Failed to generate bill cycle.');
+      toast.error('Failed to generate bill cycle.');
     }
   };
 
-  const handleDeleteBill = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this bill? This action is irreversible.')) return;
-    try {
-      await billsAPI.delete(id);
-      loadBillingData();
-    } catch (e) {
-      alert('Failed to delete bill.');
-    }
+  const handleDeleteBill = (id: string) => {
+    confirmDialog({
+      title: 'Delete Billing Cycle?',
+      message: 'Are you sure you want to delete this bill? This action is irreversible.',
+      confirmText: 'Delete Bill',
+      onConfirm: async () => {
+        try {
+          await billsAPI.delete(id);
+          toast.success('Bill deleted!');
+          loadBillingData();
+        } catch (e) {
+          toast.error('Failed to delete bill.');
+        }
+      },
+    });
   };
 
   const handleRazorpayCheckout = async (bill: Bill) => {
@@ -110,9 +125,10 @@ export const BillingTab: React.FC = () => {
             });
             setSuccessPaymentBill(bill);
             setSuccessPayment(payment);
+            toast.success('Payment verified successfully!');
             loadBillingData();
           } catch (e) {
-            alert('Signature verification failed.');
+            toast.error('Signature verification failed.');
           }
         },
         prefill: {
@@ -127,7 +143,7 @@ export const BillingTab: React.FC = () => {
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
     } catch (e) {
-      alert('Could not initialize payment order.');
+      toast.error('Could not initialize payment order.');
     }
   };
 
@@ -141,13 +157,13 @@ export const BillingTab: React.FC = () => {
         payment_method: 'Manual upload',
       });
       await billsAPI.uploadReceipt(receipt.id, billReceiptFile);
-      alert('Payment receipt uploaded successfully!');
+      toast.success('Payment receipt uploaded successfully!');
       setModalType(null);
       setBillReceiptFile(null);
       setUploadingReceiptBillId(null);
       loadBillingData();
     } catch (e) {
-      alert('Failed to upload receipt.');
+      toast.error('Failed to upload receipt.');
     }
   };
 
@@ -232,7 +248,7 @@ export const BillingTab: React.FC = () => {
                             onClick={() => setSelectedBillId(bill.id)}
                             className="text-xs text-indigo-600 font-bold hover:underline"
                           >
-                            View Resident Audits
+                            View Flat Audits
                           </button>
                         ) : (
                           <>
@@ -296,10 +312,10 @@ export const BillingTab: React.FC = () => {
 
           {user?.role === 'admin' && (
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Resident Audits</h4>
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Flat Payment Audits</h4>
               {!selectedBillId ? (
                 <p className="text-xs text-slate-400 leading-normal">
-                  Select "View Resident Audits" on any billing card to audit payments.
+                  Select "View Flat Audits" on any billing card to audit flat compliance.
                 </p>
               ) : loadingCompliance ? (
                 <div className="text-xs text-slate-500">Loading audit records...</div>
@@ -308,31 +324,39 @@ export const BillingTab: React.FC = () => {
                   <p className="text-xs text-slate-600 font-semibold mb-2">
                     Bill: {bills.find((b) => b.id === selectedBillId)?.title}
                   </p>
-                  {complianceList.map((compliance) => (
-                    <div
-                      key={compliance.user_id}
-                      className="flex justify-between items-center p-2.5 bg-slate-50 rounded border border-slate-100 text-xs"
-                    >
-                      <div>
-                        <p className="font-bold text-slate-800">{compliance.name}</p>
-                        <p className="text-slate-500 text-[10px]">Flat {compliance.flat}</p>
-                      </div>
-                      <div className="text-right">
-                        <span
-                          className={`inline-block font-bold text-[10px] px-2 py-0.5 rounded ${
-                            compliance.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {compliance.status}
-                        </span>
-                        {compliance.paid_at && (
-                          <p className="text-[10px] text-slate-400 mt-1">
-                            {new Date(compliance.paid_at).toLocaleDateString()}
+                  {complianceList.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic py-4">No flat payment records for this cycle yet.</p>
+                  ) : (
+                    complianceList.map((compliance) => (
+                      <div
+                        key={compliance.user_id}
+                        className="flex justify-between items-center p-2.5 bg-slate-50 rounded border border-slate-100 text-xs"
+                      >
+                        <div>
+                          <p className="font-bold text-slate-800">Flat {compliance.flat}</p>
+                          <p className="text-slate-500 text-[10px]">
+                            {compliance.name && compliance.name !== 'Vacant / Unassigned'
+                              ? `Paid by: ${compliance.name}`
+                              : 'Vacant / Unassigned'}
                           </p>
-                        )}
+                        </div>
+                        <div className="text-right">
+                          <span
+                            className={`inline-block font-bold text-[10px] px-2 py-0.5 rounded ${
+                              compliance.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {compliance.status}
+                          </span>
+                          {compliance.paid_at && (
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              Paid on {new Date(compliance.paid_at).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -342,6 +366,7 @@ export const BillingTab: React.FC = () => {
 
       <CreateBillModal
         isOpen={modalType === 'bill'}
+        isSuccess={isCreateBillSuccess}
         onClose={() => setModalType(null)}
         onSubmit={handleCreateBill}
         newBill={newBill}

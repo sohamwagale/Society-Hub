@@ -45,6 +45,8 @@ def list_residents(db: Session = Depends(get_db), current_user: User = Depends(g
             "phone": r.phone,
             # Map the role enum value to a string
             "role": r.role.value,
+            "flat_id": r.flat_id,
+            "resident_type": r.resident_type.value if r.resident_type else None,
             # Flatten flat details for easier consumption in mobile UI
             "flat_number": r.flat.flat_number if r.flat else None,
             "block": r.flat.block if r.flat else None,

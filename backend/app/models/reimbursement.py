@@ -62,6 +62,8 @@ class ReimbursementRequest(Base):
     status = Column(SAEnum(ReimbursementStatus), default=ReimbursementStatus.SUBMITTED, nullable=False)
     # Notes added by the reviewing administrator
     admin_notes = Column(Text, nullable=True)
+    # Payment address (UPI ID / Phone Number) supplied by claimant
+    payment_address = Column(String(200), nullable=True)
     # Foreign key link to the admin user who reviewed/actioned the request
     reviewed_by = Column(String, ForeignKey("users.id"), nullable=True)
     # Record creation timestamp

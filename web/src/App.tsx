@@ -8,10 +8,14 @@ import TermsAndConditions from './features/legal/TermsAndConditions';
 import PrivacyPolicy from './features/legal/PrivacyPolicy';
 import RefundPolicy from './features/legal/RefundPolicy';
 import ShippingPolicy from './features/legal/ShippingPolicy';
+import { ToastContainer } from './components/Toast';
+import { ConfirmContainer } from './components/ConfirmModal';
 
 function App() {
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <ToastContainer />
+      <ConfirmContainer />
       <Routes>
         <Route path="/" element={
           <ProtectedRoute>

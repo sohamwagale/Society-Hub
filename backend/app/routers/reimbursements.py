@@ -3,7 +3,7 @@ import os
 # Import uuid for generating unique request and payment IDs
 import uuid
 # Import datetime for timestamping transactions and expense dates
-from datetime import datetime
+from datetime import datetime, date
 # Import FastAPI components for routing, dependencies, errors, and file uploads
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 # Import SQLAlchemy Session for database transactions
@@ -11,12 +11,14 @@ from sqlalchemy.orm import Session
 # Import the database session utility
 from app.database import get_db
 # Import User model for context and relationship mapping
-from app.models.user import User
+from app.models.user import User, UserRole
 # Import reimbursement-related models and enums
 from app.models.reimbursement import (
     ReimbursementRequest, ReimbursementPayment,
     ReimbursementStatus, ReimbursementCategory,
 )
+from app.models.society_expense import SocietyExpense
+
 # Import Pydantic schemas for validation and output formatting
 from app.schemas.reimbursement import (
     ReimbursementCreate, ReimbursementUpdate, ReimbursementOut,
@@ -44,6 +46,11 @@ def create_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Society administrators cannot submit reimbursement claims. Admins are only authorized to review, approve, and settle claims submitted by residents."
+        )
     # Initialize a new claim record
     req = ReimbursementRequest(
         # Unique tracking ID
@@ -59,15 +66,21 @@ def create_request(
         expense_date=data.expense_date,
         # Cast input string to category enum
         category=ReimbursementCategory(data.category),
+        # Payment address / UPI ID / phone provided by claimant
+        payment_address=data.payment_address or current_user.payment_address,
         # Initial status indicating submission
         status=ReimbursementStatus.SUBMITTED,
     )
+    if data.payment_address:
+        current_user.payment_address = data.payment_address
     # Stage and commit
     db.add(req)
     db.commit()
     # Reload fresh state
     db.refresh(req)
-    return req
+    out = ReimbursementOut.model_validate(req)
+    out.payment_address = req.payment_address or (current_user.payment_address if current_user else None)
+    return out
 
 
 # GET endpoint to list reimbursement claims (context-aware)
@@ -95,8 +108,8 @@ def list_requests(db: Session = Depends(get_db), current_user: User = Depends(ge
     out_items = []
     for req in items:
         out = ReimbursementOut.model_validate(req)
-        # Pull payment coordinate from the User record
-        out.payment_address = req.user.payment_address if req.user else "Not Provided"
+        # Pull payment coordinate from claim record or User record
+        out.payment_address = req.payment_address or (req.user.payment_address if req.user else "Not Provided")
         out_items.append(out)
         
     return out_items
@@ -113,7 +126,7 @@ def get_request(request_id: str, db: Session = Depends(get_db), _: User = Depend
     
     # Validate and inject meta info
     out = ReimbursementOut.model_validate(req)
-    out.payment_address = req.user.payment_address if req.user else None
+    out.payment_address = req.payment_address or (req.user.payment_address if req.user else None)
     return out
 
 
@@ -155,7 +168,9 @@ def review_request(
         NotificationType.REIMBURSEMENT, req.id,
     )
 
-    return req
+    out = ReimbursementOut.model_validate(req)
+    out.payment_address = req.payment_address or (req.user.payment_address if req.user else None)
+    return out
 
 
 # ── Payment Processing ──
@@ -192,6 +207,29 @@ def mark_paid(
     # Advance claim state to PAID
     req.status = ReimbursementStatus.PAID
     req.updated_at = datetime.utcnow()
+
+    # Automatically generate a corresponding SocietyExpense entry
+    if isinstance(data.payment_date, datetime):
+        expense_date_val = data.payment_date
+    elif isinstance(data.payment_date, date):
+        expense_date_val = datetime.combine(data.payment_date, datetime.min.time())
+    else:
+        expense_date_val = datetime.utcnow()
+
+    resident_name = req.user.name if (req.user and req.user.name) else "Resident"
+    expense_desc = f"Reimbursement payout to {resident_name}. Method: {data.payment_method}. {req.description or ''}".strip()
+
+    society_expense = SocietyExpense(
+        id=str(uuid.uuid4()),
+        society_id=req.society_id or (admin.society_id if admin else None),
+        title=f"Reimbursement: {req.title}",
+        description=expense_desc,
+        amount=data.amount,
+        expense_date=expense_date_val,
+        document_url=req.receipt_path,
+        created_by=admin.id,
+    )
+    db.add(society_expense)
     
     # Finalize settlement
     db.commit()

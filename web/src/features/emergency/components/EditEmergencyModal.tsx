@@ -1,7 +1,7 @@
 import React from 'react';
 import SuccessTickOverlay from '../../../components/SuccessTickOverlay';
 
-interface AddEmergencyModalProps {
+interface EditEmergencyModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
@@ -14,7 +14,7 @@ interface AddEmergencyModalProps {
   isSuccess?: boolean;
 }
 
-export const AddEmergencyModal: React.FC<AddEmergencyModalProps> = ({
+export const EditEmergencyModal: React.FC<EditEmergencyModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
@@ -31,9 +31,9 @@ export const AddEmergencyModal: React.FC<AddEmergencyModalProps> = ({
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4 relative overflow-hidden">
-        <SuccessTickOverlay show={isSuccess} message="Emergency Contact Added!" />
+        <SuccessTickOverlay show={isSuccess} message="Emergency Contact Updated!" />
 
-        <h3 className="font-bold text-slate-800 text-lg">Add Emergency Contact</h3>
+        <h3 className="font-bold text-slate-800 text-lg">Edit Emergency Contact</h3>
         <div>
           <label className="block text-xs font-semibold text-slate-600 mb-1">Contact Name</label>
           <input
@@ -71,7 +71,7 @@ export const AddEmergencyModal: React.FC<AddEmergencyModalProps> = ({
         </div>
         <div className="flex gap-3 pt-2">
           <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-xs transition-colors">
-            Add Contact
+            Update Contact
           </button>
           <button type="button" onClick={onClose} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 rounded-lg text-xs transition-colors">
             Cancel
@@ -82,4 +82,4 @@ export const AddEmergencyModal: React.FC<AddEmergencyModalProps> = ({
   );
 };
 
-export default AddEmergencyModal;
+export default EditEmergencyModal;

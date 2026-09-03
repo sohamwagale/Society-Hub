@@ -4,6 +4,7 @@ import type { Complaint, ComplaintComment } from '../../types';
 import { complaintsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import CreateComplaintModal from './components/CreateComplaintModal';
+import { toast } from '../../components/Toast';
 
 export const ComplaintsTab: React.FC = () => {
   const { user } = useAuthStore();
@@ -11,10 +12,10 @@ export const ComplaintsTab: React.FC = () => {
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [comments, setComments] = useState<ComplaintComment[]>([]);
   const [commentInput, setCommentInput] = useState('');
-  const [adminNotesInput, setAdminNotesInput] = useState('');
 
   // Modal form state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [complaintCategory, setComplaintCategory] = useState<string>('plumbing');
   const [complaintTitle, setComplaintTitle] = useState('');
   const [complaintDesc, setComplaintDesc] = useState('');
@@ -56,14 +57,18 @@ export const ComplaintsTab: React.FC = () => {
         await complaintsAPI.uploadImage(complaint.id, complaintFile);
       }
 
-      alert('Grievance logged successfully!');
-      setIsModalOpen(false);
-      setComplaintTitle('');
-      setComplaintDesc('');
-      setComplaintFile(null);
-      loadComplaints();
+      setIsSuccess(true);
+      toast.success('Grievance logged successfully!');
+      setTimeout(() => {
+        setIsSuccess(false);
+        setIsModalOpen(false);
+        setComplaintTitle('');
+        setComplaintDesc('');
+        setComplaintFile(null);
+        loadComplaints();
+      }, 1000);
     } catch (e) {
-      alert('Failed to register complaint.');
+      toast.error('Failed to register complaint.');
     }
   };
 
@@ -74,8 +79,9 @@ export const ComplaintsTab: React.FC = () => {
       const c = await complaintsAPI.addComment(selectedComplaint.id, commentInput);
       setComments([...comments, c]);
       setCommentInput('');
+      toast.success('Comment posted!');
     } catch (e) {
-      alert('Failed to submit comment.');
+      toast.error('Failed to submit comment.');
     }
   };
 
@@ -84,13 +90,12 @@ export const ComplaintsTab: React.FC = () => {
     try {
       const updated = await complaintsAPI.update(selectedComplaint.id, {
         status,
-        admin_notes: adminNotesInput || undefined,
       });
       setSelectedComplaint(updated);
-      setAdminNotesInput('');
+      toast.success(`Status updated to ${status.replace('_', ' ')}!`);
       loadComplaints();
     } catch (e) {
-      alert('Failed to update ticket status.');
+      toast.error('Failed to update ticket status.');
     }
   };
 
@@ -201,29 +206,22 @@ export const ComplaintsTab: React.FC = () => {
                 )}
 
                 {user?.role === 'admin' && (
-                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs space-y-2.5 mt-4">
+                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs space-y-2 mt-4">
                     <p className="font-bold text-indigo-800">Admin Ticket Management</p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleUpdateComplaintStatus('in_progress')}
-                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-1 px-2.5 rounded text-[10px]"
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-1.5 px-3 rounded text-xs transition-colors"
                       >
                         In Progress
                       </button>
                       <button
                         onClick={() => handleUpdateComplaintStatus('resolved')}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1 px-2.5 rounded text-[10px]"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded text-xs transition-colors"
                       >
                         Resolved
                       </button>
                     </div>
-                    <textarea
-                      placeholder="Internal board notes..."
-                      value={adminNotesInput}
-                      onChange={(e) => setAdminNotesInput(e.target.value)}
-                      className="w-full border border-slate-300 rounded p-1.5 bg-white text-slate-800 focus:outline-none"
-                      rows={1.5}
-                    />
                   </div>
                 )}
 
@@ -275,6 +273,7 @@ export const ComplaintsTab: React.FC = () => {
 
       <CreateComplaintModal
         isOpen={isModalOpen}
+        isSuccess={isSuccess}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleRaiseComplaint}
         complaintCategory={complaintCategory}

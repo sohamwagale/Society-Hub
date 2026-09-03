@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Pin, Trash2, Paperclip } from 'lucide-react';
-import type { Announcement, EmergencyContact } from '../../../types';
+import type { Announcement, EmergencyContact, Society } from '../../../types';
 import { dashboardAPI, announcementsAPI, societyAPI } from '../../../services/api';
 import { useAuthStore } from '../../../store';
 import CreateAnnouncementModal from '../../announcements/components/CreateAnnouncementModal';
+import { toast } from '../../../components/Toast';
+import { confirmDialog } from '../../../components/ConfirmModal';
 
 export const OverviewTab: React.FC = () => {
   const { user } = useAuthStore();
@@ -11,34 +13,49 @@ export const OverviewTab: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
   const [societyInfo, setSocietyInfo] = useState<any[]>([]);
+  const [currentSociety, setCurrentSociety] = useState<Society | null>(null);
+  const [loadingInfo, setLoadingInfo] = useState(true);
 
   // Announcement blast modal
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [annTitle, setAnnTitle] = useState('');
   const [annBody, setAnnBody] = useState('');
   const [annPriority, setAnnPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
   const [annFile, setAnnFile] = useState<File | null>(null);
 
   const loadData = async () => {
+    setLoadingInfo(true);
     try {
-      const [stats, anns, contacts, info] = await Promise.all([
+      const [stats, ann, contacts, info, soc] = await Promise.all([
         dashboardAPI.stats(),
         announcementsAPI.list(),
         societyAPI.getEmergencyContacts(),
-        societyAPI.getInfo()
+        societyAPI.getInfo(),
+        societyAPI.listSocieties().then(list => list.find(s => s.id === user?.society_id) || null)
       ]);
       setDashboardStats(stats);
-      setAnnouncements(anns);
+      setAnnouncements(ann);
       setEmergencyContacts(contacts);
       setSocietyInfo(info);
+      setCurrentSociety(soc);
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoadingInfo(false);
     }
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
+
+  const getInfoValue = (key: string, fallback?: string) => {
+    const found = societyInfo.find((i) => i.key === key)?.value;
+    if (found) return found;
+    if (fallback) return fallback;
+    return 'Not specified';
+  };
 
   const handleBlastAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,15 +69,19 @@ export const OverviewTab: React.FC = () => {
         annFile || undefined
       );
 
-      alert('Announcement broadcasted!');
-      setIsModalOpen(false);
-      setAnnTitle('');
-      setAnnBody('');
-      setAnnPriority('normal');
-      setAnnFile(null);
-      loadData();
+      setIsSuccess(true);
+      toast.success('Announcement broadcasted!');
+      setTimeout(() => {
+        setIsSuccess(false);
+        setIsModalOpen(false);
+        setAnnTitle('');
+        setAnnBody('');
+        setAnnPriority('normal');
+        setAnnFile(null);
+        loadData();
+      }, 1000);
     } catch (e) {
-      alert('Broadcast failure.');
+      toast.error('Broadcast failure.');
     }
   };
 
@@ -73,14 +94,21 @@ export const OverviewTab: React.FC = () => {
     }
   };
 
-  const handleDeleteAnnouncement = async (id: string) => {
-    if (!window.confirm('Delete announcement?')) return;
-    try {
-      await announcementsAPI.delete(id);
-      loadData();
-    } catch (e) {
-      console.error(e);
-    }
+  const handleDeleteAnnouncement = (id: string) => {
+    confirmDialog({
+      title: 'Delete Announcement?',
+      message: 'This announcement notice will be permanently removed.',
+      confirmText: 'Delete Notice',
+      onConfirm: async () => {
+        try {
+          await announcementsAPI.delete(id);
+          toast.success('Announcement deleted!');
+          loadData();
+        } catch (e) {
+          toast.error('Failed to delete announcement.');
+        }
+      },
+    });
   };
 
   return (
@@ -212,15 +240,15 @@ export const OverviewTab: React.FC = () => {
               <div className="text-xs space-y-2">
                 <p>
                   <strong>Society Name:</strong>{' '}
-                  {societyInfo.find((i) => i.key === 'society_name')?.value || 'Loading...'}
+                  {loadingInfo ? 'Loading...' : getInfoValue('society_name', currentSociety?.name)}
                 </p>
                 <p>
                   <strong>Address:</strong>{' '}
-                  {societyInfo.find((i) => i.key === 'address')?.value || 'Loading...'}
+                  {loadingInfo ? 'Loading...' : getInfoValue('address', currentSociety?.address)}
                 </p>
                 <p>
                   <strong>Registration No:</strong>{' '}
-                  {societyInfo.find((i) => i.key === 'registration_no')?.value || 'Loading...'}
+                  {loadingInfo ? 'Loading...' : getInfoValue('registration_no')}
                 </p>
               </div>
               <hr className="my-2 border-slate-100" />
@@ -249,6 +277,7 @@ export const OverviewTab: React.FC = () => {
 
       <CreateAnnouncementModal
         isOpen={isModalOpen}
+        isSuccess={isSuccess}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleBlastAnnouncement}
         title={annTitle}

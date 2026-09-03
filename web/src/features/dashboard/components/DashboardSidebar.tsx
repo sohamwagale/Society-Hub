@@ -36,10 +36,10 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     { id: 'reimbursements', icon: HeartHandshake, label: 'Reimbursements' },
     { id: 'polls', icon: BarChart3, label: 'Community Polls' },
     { id: 'emergency', icon: PhoneCall, label: 'Society Info Book' },
-    ...(user?.role === 'admin' ? [
-      { id: 'flats', icon: Home, label: 'Flat Management' },
-      { id: 'approvals', icon: ShieldAlert, label: 'KYC Queue' },
-      { id: 'activity-log', icon: Activity, label: 'Audit Logs' }
+    ...((user?.role === 'admin' || user?.resident_type === 'owner' || user?.resident_type === 'renter') ? [
+      ...(user?.role === 'admin' ? [{ id: 'flats', icon: Home, label: 'Flat Management' }] : []),
+      { id: 'approvals', icon: ShieldAlert, label: user?.role === 'admin' ? 'KYC Queue' : 'Member Approvals' },
+      ...(user?.role === 'admin' ? [{ id: 'activity-log', icon: Activity, label: 'Audit Logs' }] : [])
     ] : []),
   ];
 

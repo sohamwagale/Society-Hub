@@ -96,19 +96,29 @@ def update_society_info(
     db: Session = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ):
-    # Attempt to find the existing record by its unique key
     info = db.query(SocietyInfo).filter(SocietyInfo.key == data.key).first()
     if info:
-        # Update value if key exists
         info.value = data.value
     else:
-        # Create a new record if key is new
         info = SocietyInfo(key=data.key, value=data.value)
         db.add(info)
-    # Commit changes
     db.commit()
-    # Return the updated key-pair
     return {"key": data.key, "value": data.value}
+
+
+# DELETE endpoint to remove a key-value parameter from society information (Admin only)
+@router.delete("/info/{key}", status_code=204)
+def delete_society_info(
+    key: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    info = db.query(SocietyInfo).filter(SocietyInfo.key == key).first()
+    if not info:
+        raise HTTPException(status_code=404, detail="Parameter not found")
+    db.delete(info)
+    db.commit()
+    return None
 
 
 # ── Emergency Contacts Directory ──
@@ -116,7 +126,6 @@ def update_society_info(
 # GET endpoint to list all helpdesk and emergency contacts
 @router.get("/emergency-contacts", response_model=list[EmergencyContactOut])
 def list_emergency_contacts(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
-    # Return all contacts ordered alphabetically by their role (e.g., 'Electrician', 'Security')
     return db.query(EmergencyContact).order_by(EmergencyContact.role).all()
 
 
@@ -127,17 +136,12 @@ def create_emergency_contact(
     db: Session = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ):
-    # Create new contact instance with a unique UUID
     contact = EmergencyContact(
         id=str(uuid.uuid4()), name=data.name, phone=data.phone, role=data.role,
     )
-    # Add and persist
     db.add(contact)
-    # Commit
     db.commit()
-    # Refresh record
     db.refresh(contact)
-    # Return the new contact object
     return contact
 
 
@@ -148,14 +152,28 @@ def delete_emergency_contact(
     db: Session = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ):
-    # Search for the target contact by ID
     contact = db.query(EmergencyContact).filter(EmergencyContact.id == contact_id).first()
-    # Handle not found scenario
     if not contact:
         raise HTTPException(status_code=404, detail="Not found")
-    # Delete the record
     db.delete(contact)
-    # Commit deletion
     db.commit()
-    # Return empty 204 response
+    return None
 
+
+# PUT endpoint to update an emergency contact (Admin only)
+@router.put("/emergency-contacts/{contact_id}", response_model=EmergencyContactOut)
+def update_emergency_contact(
+    contact_id: str,
+    data: EmergencyContactCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    contact = db.query(EmergencyContact).filter(EmergencyContact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    contact.name = data.name
+    contact.phone = data.phone
+    contact.role = data.role
+    db.commit()
+    db.refresh(contact)
+    return contact

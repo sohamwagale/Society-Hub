@@ -1,4 +1,5 @@
 import React from 'react';
+import SuccessTickOverlay from '../../../components/SuccessTickOverlay';
 
 interface UploadDocumentModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface UploadDocumentModalProps {
   docDesc: string;
   setDocDesc: (val: string) => void;
   setDocFile: (file: File | null) => void;
+  isSuccess?: boolean;
 }
 
 export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
@@ -19,13 +21,16 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   setDocTitle,
   docDesc,
   setDocDesc,
-  setDocFile
+  setDocFile,
+  isSuccess = false,
 }) => {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4">
+      <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4 relative overflow-hidden">
+        <SuccessTickOverlay show={isSuccess} message="Document Uploaded Successfully!" />
+
         <h3 className="font-bold text-slate-800 text-lg">Upload Archive Document</h3>
         <div>
           <label className="block text-xs font-semibold text-slate-600 mb-1">Document Title</label>
@@ -58,10 +63,10 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
           />
         </div>
         <div className="flex gap-3 pt-2">
-          <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-xs">
+          <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-xs transition-colors">
             Upload File
           </button>
-          <button type="button" onClick={onClose} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 rounded-lg text-xs">
+          <button type="button" onClick={onClose} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 rounded-lg text-xs transition-colors">
             Cancel
           </button>
         </div>

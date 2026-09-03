@@ -4,11 +4,14 @@ import type { Poll } from '../../types';
 import { pollsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import CreatePollModal from './components/CreatePollModal';
+import { toast } from '../../components/Toast';
+import { confirmDialog } from '../../components/ConfirmModal';
 
 export const PollsTab: React.FC = () => {
   const { user } = useAuthStore();
   const [polls, setPolls] = useState<Poll[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   // Form state
   const [pollTitle, setPollTitle] = useState('');
@@ -31,51 +34,69 @@ export const PollsTab: React.FC = () => {
 
   const handleCreatePoll = async (e: React.FormEvent) => {
     e.preventDefault();
+    const validOptions = pollOptions.map((opt) => opt.trim()).filter((opt) => opt.length > 0);
+    if (validOptions.length < 2) {
+      toast.warning('Please provide at least 2 valid poll options.');
+      return;
+    }
     try {
       await pollsAPI.create({
         title: pollTitle,
         description: pollDesc || undefined,
         deadline: pollDeadline,
-        options: pollOptions.map((opt) => ({ text: opt })),
+        options: validOptions.map((opt) => ({ text: opt })),
       });
-      alert('Survey launched successfully!');
-      setIsModalOpen(false);
-      setPollTitle('');
-      setPollDesc('');
-      setPollDeadline('');
-      setPollOptions(['Yes', 'No']);
-      loadPolls();
+      setIsSuccess(true);
+      toast.success('Survey launched successfully!');
+      setTimeout(() => {
+        setIsSuccess(false);
+        setIsModalOpen(false);
+        setPollTitle('');
+        setPollDesc('');
+        setPollDeadline('');
+        setPollOptions(['Yes', 'No']);
+        loadPolls();
+      }, 1000);
     } catch (e) {
-      alert('Failed to create poll.');
+      toast.error('Failed to create poll.');
     }
   };
 
   const handleVote = async (pollId: string, optionId: string) => {
     try {
       await pollsAPI.vote(pollId, optionId);
+      toast.success('Vote recorded!');
       loadPolls();
     } catch (e) {
-      alert('Failed to register vote.');
+      toast.error('Failed to register vote.');
     }
   };
 
   const handleClosePoll = async (id: string) => {
     try {
       await pollsAPI.close(id);
+      toast.success('Poll closed!');
       loadPolls();
     } catch (e) {
-      alert('Failed to close poll.');
+      toast.error('Failed to close poll.');
     }
   };
 
-  const handleDeletePoll = async (id: string) => {
-    if (!window.confirm('Delete this poll?')) return;
-    try {
-      await pollsAPI.delete(id);
-      loadPolls();
-    } catch (e) {
-      alert('Failed to delete poll.');
-    }
+  const handleDeletePoll = (id: string) => {
+    confirmDialog({
+      title: 'Delete Survey Poll?',
+      message: 'Are you sure you want to delete this community survey poll?',
+      confirmText: 'Delete Poll',
+      onConfirm: async () => {
+        try {
+          await pollsAPI.delete(id);
+          toast.success('Poll deleted!');
+          loadPolls();
+        } catch (e) {
+          toast.error('Failed to delete poll.');
+        }
+      },
+    });
   };
 
   return (
@@ -174,6 +195,7 @@ export const PollsTab: React.FC = () => {
 
       <CreatePollModal
         isOpen={isModalOpen}
+        isSuccess={isSuccess}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreatePoll}
         pollTitle={pollTitle}
@@ -183,6 +205,7 @@ export const PollsTab: React.FC = () => {
         pollDeadline={pollDeadline}
         setPollDeadline={setPollDeadline}
         pollOptions={pollOptions}
+        setPollOptions={setPollOptions}
       />
     </div>
   );

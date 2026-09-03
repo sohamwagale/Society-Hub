@@ -4,11 +4,13 @@ import type { SocietyExpense } from '../../types';
 import { expensesAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import AddExpenseModal from './components/AddExpenseModal';
+import { toast } from '../../components/Toast';
 
 export const ExpensesTab: React.FC = () => {
   const { user } = useAuthStore();
   const [expenses, setExpenses] = useState<SocietyExpense[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   // Form state
   const [expenseTitle, setExpenseTitle] = useState('');
@@ -43,16 +45,20 @@ export const ExpensesTab: React.FC = () => {
         expenseFile || undefined
       );
 
-      alert('Expenditure logged successfully!');
-      setIsModalOpen(false);
-      setExpenseTitle('');
-      setExpenseDesc('');
-      setExpenseAmount(0);
-      setExpenseDate('');
-      setExpenseFile(null);
-      loadExpenses();
+      setIsSuccess(true);
+      toast.success('Expenditure logged successfully!');
+      setTimeout(() => {
+        setIsSuccess(false);
+        setIsModalOpen(false);
+        setExpenseTitle('');
+        setExpenseDesc('');
+        setExpenseAmount(0);
+        setExpenseDate('');
+        setExpenseFile(null);
+        loadExpenses();
+      }, 1000);
     } catch (e) {
-      alert('Failed to record expense.');
+      toast.error('Failed to record expense.');
     }
   };
 
@@ -126,6 +132,7 @@ export const ExpensesTab: React.FC = () => {
 
       <AddExpenseModal
         isOpen={isModalOpen}
+        isSuccess={isSuccess}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleLogExpense}
         expenseTitle={expenseTitle}
