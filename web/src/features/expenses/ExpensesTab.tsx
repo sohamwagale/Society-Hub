@@ -57,7 +57,7 @@ export const ExpensesTab: React.FC = () => {
         setExpenseFile(null);
         loadExpenses();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to record expense.');
     }
   };

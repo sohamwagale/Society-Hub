@@ -1,18 +1,18 @@
 import React, { useRef, useEffect } from 'react';
 import { Menu, Bell } from 'lucide-react';
-import type { User } from '../../../types';
+import type { User, Notification } from '../../../types';
 import NotificationDropdown from './NotificationDropdown';
 
 interface DashboardHeaderProps {
   user: User | null;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
-  notifications: any[];
+  notifications: Notification[];
   isNotificationOpen: boolean;
   setIsNotificationOpen: (open: boolean) => void;
   onMarkAllRead: () => void;
   onClearAll: () => void;
-  onNotificationClick?: (notification: any) => void;
+  onNotificationClick?: (notification: Notification) => void;
   onClearNotification?: (id: string) => void;
 }
 

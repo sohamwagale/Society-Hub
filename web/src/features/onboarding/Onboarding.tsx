@@ -78,8 +78,9 @@ export const Onboarding: React.FC = () => {
         pan_number: pan || undefined,
       });
       await refreshUser();
-    } catch (err: any) {
-      setJoinError(err.response?.data?.detail || 'Failed to join society.');
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { detail?: string } } };
+      setJoinError(errorObj.response?.data?.detail || 'Failed to join society.');
     } finally {
       setSubmittingJoin(false);
     }
@@ -117,8 +118,9 @@ export const Onboarding: React.FC = () => {
       });
       await refreshUser();
       navigate('/');
-    } catch (err: any) {
-      setCreateError(err.response?.data?.detail || 'Failed to create society.');
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { detail?: string } } };
+      setCreateError(errorObj.response?.data?.detail || 'Failed to create society.');
     } finally {
       setSubmittingCreate(false);
     }

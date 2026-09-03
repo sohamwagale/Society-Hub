@@ -57,7 +57,7 @@ export const PollsTab: React.FC = () => {
         setPollOptions(['Yes', 'No']);
         loadPolls();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to create poll.');
     }
   };
@@ -67,7 +67,7 @@ export const PollsTab: React.FC = () => {
       await pollsAPI.vote(pollId, optionId);
       toast.success('Vote recorded!');
       loadPolls();
-    } catch (e) {
+    } catch {
       toast.error('Failed to register vote.');
     }
   };
@@ -77,7 +77,7 @@ export const PollsTab: React.FC = () => {
       await pollsAPI.close(id);
       toast.success('Poll closed!');
       loadPolls();
-    } catch (e) {
+    } catch {
       toast.error('Failed to close poll.');
     }
   };
@@ -92,7 +92,7 @@ export const PollsTab: React.FC = () => {
           await pollsAPI.delete(id);
           toast.success('Poll deleted!');
           loadPolls();
-        } catch (e) {
+        } catch {
           toast.error('Failed to delete poll.');
         }
       },

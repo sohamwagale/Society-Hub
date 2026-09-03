@@ -48,7 +48,7 @@ export const FlatsTab: React.FC = () => {
       await onboardingAPI.approve(id, approve);
       toast.success(approve ? 'User approved!' : 'Application rejected.');
       loadData();
-    } catch (e) {
+    } catch {
       toast.error('Verification decision failed.');
     }
   };
@@ -68,7 +68,7 @@ export const FlatsTab: React.FC = () => {
         setNewFlatFloor('');
         loadData();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to register flat.');
     }
   };
@@ -82,7 +82,7 @@ export const FlatsTab: React.FC = () => {
       setSelectedFlatForAssign(null);
       setResidentAssignSearch('');
       loadData();
-    } catch (e) {
+    } catch {
       toast.error('Failed to assign resident.');
     }
   };
@@ -97,7 +97,7 @@ export const FlatsTab: React.FC = () => {
           await flatsAPI.assignUser(resident.id, null);
           toast.success('Resident unlinked successfully!');
           loadData();
-        } catch (e) {
+        } catch {
           toast.error('Failed to unlink resident.');
         }
       },

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Pin, Trash2, Paperclip } from 'lucide-react';
-import type { Announcement, EmergencyContact, Society } from '../../../types';
+import type { Announcement, EmergencyContact, Society, DashboardStats, SocietyInfoItem } from '../../../types';
 import { dashboardAPI, announcementsAPI, societyAPI } from '../../../services/api';
 import { useAuthStore } from '../../../store';
 import CreateAnnouncementModal from '../../announcements/components/CreateAnnouncementModal';
@@ -9,10 +9,10 @@ import { confirmDialog } from '../../../components/ConfirmModal';
 
 export const OverviewTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [dashboardStats, setDashboardStats] = useState<any>(null);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
-  const [societyInfo, setSocietyInfo] = useState<any[]>([]);
+  const [societyInfo, setSocietyInfo] = useState<SocietyInfoItem[]>([]);
   const [currentSociety, setCurrentSociety] = useState<Society | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(true);
 
@@ -80,7 +80,7 @@ export const OverviewTab: React.FC = () => {
         setAnnFile(null);
         loadData();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Broadcast failure.');
     }
   };
@@ -104,7 +104,7 @@ export const OverviewTab: React.FC = () => {
           await announcementsAPI.delete(id);
           toast.success('Announcement deleted!');
           loadData();
-        } catch (e) {
+        } catch {
           toast.error('Failed to delete announcement.');
         }
       },

@@ -1,17 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { X } from 'lucide-react';
+import type { Notification } from '../../../types';
 
 interface NotificationDropdownProps {
-  notifications: any[];
+  notifications: Notification[];
   isOpen: boolean;
   onMarkAllRead: () => void;
   onClearAll: () => void;
-  onNotificationClick?: (notification: any) => void;
+  onNotificationClick?: (notification: Notification) => void;
   onClearNotification?: (id: string) => void;
 }
 
 interface NotificationRowProps {
-  notification: any;
+  notification: Notification;
   onClick: () => void;
   onClear: () => void;
 }

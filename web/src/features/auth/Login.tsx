@@ -13,7 +13,7 @@ export const Login: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const from = (location.state as any)?.from?.pathname || '/';
+  const from = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/';
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -35,9 +35,10 @@ export const Login: React.FC = () => {
     setError('');
     try {
       await login(email, password);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { detail?: string } } };
       setError(
-        err.response?.data?.detail || 
+        errorObj.response?.data?.detail || 
         'Invalid email or password. Please try again.'
       );
     } finally {

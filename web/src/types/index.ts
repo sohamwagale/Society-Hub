@@ -275,7 +275,7 @@ export interface SocietyExpenseCreate {
   description?: string;
   amount: number;
   expense_date: string;
-  document?: any;
+  document?: File;
 }
 
 export interface DashboardStats {

@@ -30,9 +30,10 @@ export const Register: React.FC = () => {
         password,
       });
       setSuccess(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { detail?: string } } };
       setError(
-        err.response?.data?.detail || 
+        errorObj.response?.data?.detail || 
         'Registration failed. Email might already be in use.'
       );
     } finally {

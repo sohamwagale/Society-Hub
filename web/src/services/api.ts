@@ -119,7 +119,7 @@ export const authAPI = {
 
 export const billsAPI = {
   list: async (billType?: string, activeOnly?: boolean): Promise<Bill[]> => {
-    const params: any = {};
+    const params: Record<string, string | boolean> = {};
     if (billType) params.bill_type = billType;
     if (activeOnly !== undefined) params.active_only = activeOnly;
     const { data } = await api.get<Bill[]>('/bills', { params });
@@ -245,7 +245,7 @@ export const documentsAPI = {
 
 export const complaintsAPI = {
   list: async (status?: string, category?: string): Promise<Complaint[]> => {
-    const params: any = {};
+    const params: Record<string, string> = {};
     if (status) params.status = status;
     if (category) params.category = category;
     const { data } = await api.get<Complaint[]>('/complaints/', { params });
@@ -411,7 +411,7 @@ export const residentsAPI = {
     const { data } = await api.get<ResidentStats>('/residents/stats');
     return data;
   },
-  setCommittee: async (userId: string, isCommittee: boolean, role?: string): Promise<any> => {
+  setCommittee: async (userId: string, isCommittee: boolean, role?: string): Promise<ResidentInfo> => {
     const { data } = await api.put(`/residents/${userId}/committee`, { is_committee: isCommittee, committee_role: role });
     return data;
   },
@@ -466,7 +466,7 @@ export const societyAPI = {
 
 export const activityLogAPI = {
   list: async (skip = 0, limit = 50, entityType?: string): Promise<ActivityLog[]> => {
-    const params: any = { skip, limit };
+    const params: Record<string, string | number> = { skip, limit };
     if (entityType) params.entity_type = entityType;
     const { data } = await api.get<ActivityLog[]>('/activity-log', { params });
     return data;

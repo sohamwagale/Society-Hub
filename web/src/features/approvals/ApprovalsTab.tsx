@@ -31,7 +31,7 @@ export const ApprovalsTab: React.FC = () => {
       await onboardingAPI.approve(id, approve);
       toast.success(approve ? 'User approved!' : 'Application rejected.');
       loadApprovals();
-    } catch (e) {
+    } catch {
       toast.error('Verification decision failed.');
     }
   };

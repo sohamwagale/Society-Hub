@@ -55,7 +55,7 @@ export const AnnouncementsTab: React.FC = () => {
         setAnnFile(null);
         loadAnnouncements();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to broadcast notice.');
     }
   };
@@ -65,7 +65,7 @@ export const AnnouncementsTab: React.FC = () => {
       await announcementsAPI.togglePin(id);
       toast.success('Pin status toggled!');
       loadAnnouncements();
-    } catch (e) {
+    } catch {
       toast.error('Failed to toggle pin.');
     }
   };
@@ -80,7 +80,7 @@ export const AnnouncementsTab: React.FC = () => {
           await announcementsAPI.delete(id);
           toast.success('Announcement deleted!');
           loadAnnouncements();
-        } catch (e) {
+        } catch {
           toast.error('Failed to delete announcement.');
         }
       },

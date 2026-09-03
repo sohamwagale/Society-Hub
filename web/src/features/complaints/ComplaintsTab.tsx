@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, HelpCircle, X } from 'lucide-react';
-import type { Complaint, ComplaintComment } from '../../types';
+import type { Complaint, ComplaintComment, ComplaintCategory } from '../../types';
 import { complaintsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import CreateComplaintModal from './components/CreateComplaintModal';
@@ -48,7 +48,7 @@ export const ComplaintsTab: React.FC = () => {
     e.preventDefault();
     try {
       const complaint = await complaintsAPI.create({
-        category: complaintCategory as any,
+        category: complaintCategory as ComplaintCategory,
         title: complaintTitle,
         description: complaintDesc,
       });
@@ -67,7 +67,7 @@ export const ComplaintsTab: React.FC = () => {
         setComplaintFile(null);
         loadComplaints();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to register complaint.');
     }
   };
@@ -80,7 +80,7 @@ export const ComplaintsTab: React.FC = () => {
       setComments([...comments, c]);
       setCommentInput('');
       toast.success('Comment posted!');
-    } catch (e) {
+    } catch {
       toast.error('Failed to submit comment.');
     }
   };
@@ -94,7 +94,7 @@ export const ComplaintsTab: React.FC = () => {
       setSelectedComplaint(updated);
       toast.success(`Status updated to ${status.replace('_', ' ')}!`);
       loadComplaints();
-    } catch (e) {
+    } catch {
       toast.error('Failed to update ticket status.');
     }
   };

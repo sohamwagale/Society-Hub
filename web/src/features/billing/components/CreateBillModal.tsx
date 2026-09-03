@@ -7,7 +7,7 @@ interface CreateBillModalProps {
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
   newBill: BillCreate;
-  setNewBill: React.Dispatch<React.SetStateAction<BillCreate>> | ((val: any) => void);
+  setNewBill: React.Dispatch<React.SetStateAction<BillCreate>>;
   isSuccess?: boolean;
 }
 

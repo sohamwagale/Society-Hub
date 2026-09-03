@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, PhoneCall, Trash2, Pencil } from 'lucide-react';
-import type { EmergencyContact } from '../../types';
+import type { EmergencyContact, SocietyInfoItem } from '../../types';
 import { societyAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import AddEmergencyModal from './components/AddEmergencyModal';
@@ -13,7 +13,7 @@ import { confirmDialog } from '../../components/ConfirmModal';
 export const EmergencyInfoTab: React.FC = () => {
   const { user } = useAuthStore();
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
-  const [societyInfo, setSocietyInfo] = useState<any[]>([]);
+  const [societyInfo, setSocietyInfo] = useState<SocietyInfoItem[]>([]);
 
   // Modals state
   const [modalType, setModalType] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export const EmergencyInfoTab: React.FC = () => {
         setEmergRole('');
         loadData();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to add contact.');
     }
   };
@@ -91,7 +91,7 @@ export const EmergencyInfoTab: React.FC = () => {
         setEmergRole('');
         loadData();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to update contact.');
     }
   };
@@ -106,7 +106,7 @@ export const EmergencyInfoTab: React.FC = () => {
           await societyAPI.deleteEmergencyContact(id);
           toast.success('Contact removed!');
           loadData();
-        } catch (e) {
+        } catch {
           toast.error('Failed to remove contact.');
         }
       },
@@ -123,7 +123,7 @@ export const EmergencyInfoTab: React.FC = () => {
           await societyAPI.deleteInfo(key);
           toast.success('Parameter removed!');
           loadData();
-        } catch (e) {
+        } catch {
           toast.error('Failed to remove parameter.');
         }
       },
@@ -140,7 +140,7 @@ export const EmergencyInfoTab: React.FC = () => {
       setEditInfoKey('');
       setEditInfoValue('');
       loadData();
-    } catch (e) {
+    } catch {
       toast.error('Failed to update parameter.');
     }
   };
@@ -156,7 +156,7 @@ export const EmergencyInfoTab: React.FC = () => {
       setNewInfoKey('');
       setNewInfoValue('');
       loadData();
-    } catch (e) {
+    } catch {
       toast.error('Failed to add custom attribute.');
     }
   };

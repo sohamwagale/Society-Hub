@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Eye } from 'lucide-react';
-import type { ReimbursementRequest } from '../../types';
+import type { ReimbursementRequest, ReimbursementCategory } from '../../types';
 import { reimbursementsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import CreateReimbursementModal from './components/CreateReimbursementModal';
@@ -49,7 +49,7 @@ export const ReimbursementsTab: React.FC = () => {
         description: reimbDesc,
         amount: reimbAmount,
         expense_date: reimbDate,
-        category: reimbCategory as any,
+        category: reimbCategory as ReimbursementCategory,
         payment_address: reimbPaymentAddress || undefined,
       });
 
@@ -70,7 +70,7 @@ export const ReimbursementsTab: React.FC = () => {
         setReimbFile(null);
         loadReimbursements();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to submit reimbursement request.');
     }
   };
@@ -90,8 +90,9 @@ export const ReimbursementsTab: React.FC = () => {
       setSelectedReimbursement(updated);
       toast.success(`Claim ${status}!`);
       loadReimbursements();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Review submission failed.');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      toast.error(err?.response?.data?.detail || 'Review submission failed.');
       throw e;
     }
   };
@@ -113,8 +114,9 @@ export const ReimbursementsTab: React.FC = () => {
       setSelectedReimbursement(null);
       toast.success('Payout marked paid & cleared!');
       loadReimbursements();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Failed to mark claim as cleared.');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      toast.error(err?.response?.data?.detail || 'Failed to mark claim as cleared.');
       throw e;
     }
   };
@@ -128,8 +130,9 @@ export const ReimbursementsTab: React.FC = () => {
       setSelectedReimbursement(updated);
       toast.success(`Claim ${status}!`);
       loadReimbursements();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Review submission failed.');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      toast.error(err?.response?.data?.detail || 'Review submission failed.');
     }
   };
 

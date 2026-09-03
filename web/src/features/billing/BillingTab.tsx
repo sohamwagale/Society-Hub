@@ -9,6 +9,12 @@ import PaymentSuccessModal from './components/PaymentSuccessModal';
 import { toast } from '../../components/Toast';
 import { confirmDialog } from '../../components/ConfirmModal';
 
+interface RazorpayResponse {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}
+
 export const BillingTab: React.FC = () => {
   const { user } = useAuthStore();
   const [bills, setBills] = useState<Bill[]>([]);
@@ -84,7 +90,7 @@ export const BillingTab: React.FC = () => {
         setNewBill({ title: '', description: '', amount: 0, due_date: '', bill_type: 'maintenance' });
         loadBillingData();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to generate bill cycle.');
     }
   };
@@ -99,7 +105,7 @@ export const BillingTab: React.FC = () => {
           await billsAPI.delete(id);
           toast.success('Bill deleted!');
           loadBillingData();
-        } catch (e) {
+        } catch{
           toast.error('Failed to delete bill.');
         }
       },
@@ -116,7 +122,7 @@ export const BillingTab: React.FC = () => {
         name: 'Society Hub',
         description: bill.title,
         order_id: order.razorpay_order_id,
-        handler: async (response: any) => {
+        handler: async (response: RazorpayResponse) => {
           try {
             const payment = await billsAPI.verifyRazorpayPayment(bill.id, {
               razorpay_order_id: response.razorpay_order_id,
@@ -127,7 +133,7 @@ export const BillingTab: React.FC = () => {
             setSuccessPayment(payment);
             toast.success('Payment verified successfully!');
             loadBillingData();
-          } catch (e) {
+          } catch {
             toast.error('Signature verification failed.');
           }
         },
@@ -140,9 +146,9 @@ export const BillingTab: React.FC = () => {
           color: '#4F46E5',
         },
       };
-      const rzp = new (window as any).Razorpay(options);
+      const rzp = new (window as unknown as { Razorpay: new (options: unknown) => { open: () => void } }).Razorpay(options);
       rzp.open();
-    } catch (e) {
+    } catch {
       toast.error('Could not initialize payment order.');
     }
   };
@@ -162,7 +168,7 @@ export const BillingTab: React.FC = () => {
       setBillReceiptFile(null);
       setUploadingReceiptBillId(null);
       loadBillingData();
-    } catch (e) {
+    } catch {
       toast.error('Failed to upload receipt.');
     }
   };

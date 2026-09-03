@@ -32,7 +32,7 @@ export const ResidentsTab: React.FC = () => {
       setCommitteeRoleInput('');
       setActiveResidentId(null);
       loadResidents();
-    } catch (e) {
+    } catch {
       toast.error('Failed to update resident committee membership.');
     }
   };

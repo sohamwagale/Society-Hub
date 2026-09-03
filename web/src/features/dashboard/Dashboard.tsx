@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store';
 import { notificationsAPI, onboardingAPI } from '../../services/api';
+import type { Notification } from '../../types';
 
 // Shell components
 import DashboardSidebar from './components/DashboardSidebar';
@@ -31,7 +32,7 @@ export const Dashboard: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Global Header Notifications & Approvals State
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
 
@@ -113,7 +114,7 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleNotificationClick = async (notif: any) => {
+  const handleNotificationClick = async (notif: Notification) => {
     try {
       await notificationsAPI.deleteSingle(notif.id);
       setNotifications((prev) => prev.filter((n) => n.id !== notif.id));

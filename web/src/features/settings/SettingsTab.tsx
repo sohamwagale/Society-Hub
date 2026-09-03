@@ -24,7 +24,7 @@ export const SettingsTab: React.FC = () => {
       });
       await refreshUser();
       setSettingsSuccess('Profile details updated successfully!');
-    } catch (e) {
+    } catch {
       setSettingsError('Failed to update profile settings.');
     }
   };
@@ -38,8 +38,9 @@ export const SettingsTab: React.FC = () => {
       setOldPassword('');
       setNewPassword('');
       setSettingsSuccess('Password changed successfully!');
-    } catch (e: any) {
-      setSettingsError(e.response?.data?.detail || 'Failed to rotate password.');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      setSettingsError(err.response?.data?.detail || 'Failed to rotate password.');
     }
   };
 

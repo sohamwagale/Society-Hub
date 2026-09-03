@@ -46,7 +46,7 @@ export const DocumentsTab: React.FC = () => {
         setDocFile(null);
         loadDocuments();
       }, 1000);
-    } catch (e) {
+    } catch {
       toast.error('Failed to upload document.');
     }
   };
@@ -56,7 +56,7 @@ export const DocumentsTab: React.FC = () => {
       await documentsAPI.approve(id);
       toast.success('Document approved!');
       loadDocuments();
-    } catch (e) {
+    } catch {
       toast.error('Failed to approve document.');
     }
   };
@@ -71,7 +71,7 @@ export const DocumentsTab: React.FC = () => {
           await documentsAPI.delete(id);
           toast.success('Document deleted!');
           loadDocuments();
-        } catch (e) {
+        } catch {
           toast.error('Failed to delete document.');
         }
       },
