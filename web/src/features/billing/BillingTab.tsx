@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Download, Plus } from 'lucide-react';
 import type { Bill, BillCreate, BillPayment } from '../../types';
 import { billsAPI } from '../../services/api';
@@ -53,16 +53,26 @@ export const BillingTab: React.FC = () => {
   const [successPayment, setSuccessPayment] = useState<BillPayment | null>(null);
   const [successPaymentBill, setSuccessPaymentBill] = useState<Bill | null>(null);
 
-  // Dynamically inject Razorpay Web Checkout script
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !document.getElementById('razorpay-checkout-script')) {
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (typeof window !== 'undefined' && (window as unknown as { Razorpay?: unknown }).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const existing = document.getElementById('razorpay-checkout-script');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(true));
+        existing.addEventListener('error', () => resolve(false));
+        return;
+      }
       const script = document.createElement('script');
       script.id = 'razorpay-checkout-script';
       script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
       document.body.appendChild(script);
-    }
-  }, []);
+    });
+  };
 
   const handleCreateBill = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +108,11 @@ export const BillingTab: React.FC = () => {
 
   const handleRazorpayCheckout = async (bill: Bill) => {
     try {
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        toast.error('Failed to load payment checkout SDK. Please check connection.');
+        return;
+      }
       const order = await billsAPI.createRazorpayOrder(bill.id);
       const options = {
         key: order.key_id,
@@ -156,9 +171,9 @@ export const BillingTab: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-        <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-6">
+    <div className="space-y-6 font-sans">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-100 mb-6">
           <div>
             <h3 className="font-bold text-slate-800 text-lg">Billing &amp; Maintenance Dues</h3>
             <p className="text-slate-500 text-xs mt-1">Review active billing cycles, pay online, or audit compliance.</p>

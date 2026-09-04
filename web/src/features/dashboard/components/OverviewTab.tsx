@@ -169,7 +169,7 @@ export const OverviewTab: React.FC = () => {
                   <div className="flex justify-between items-start">
                     <div className="flex gap-2 items-center">
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize ${
                           ann.priority === 'urgent'
                             ? 'bg-red-100 text-red-700'
                             : ann.priority === 'important'

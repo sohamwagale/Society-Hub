@@ -69,7 +69,7 @@ export const ActivityLogTab: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Entity Filter */}
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs">
             <Filter size={14} className="text-slate-400" />
@@ -111,7 +111,7 @@ export const ActivityLogTab: React.FC = () => {
 
       {/* Logs Table / List */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+        <table className="w-full min-w-[550px] text-left text-xs border-collapse">
           <thead>
             <tr className="border-b border-slate-200 text-slate-400 font-semibold uppercase tracking-wider bg-slate-50/50">
               <th className="py-3 px-4">Timestamp</th>
@@ -153,7 +153,7 @@ export const ActivityLogTab: React.FC = () => {
                   <td className="py-3.5 px-4">
                     {log.entity_type ? (
                       <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${getEntityBadgeColor(
+                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold border ${getEntityBadgeColor(
                           log.entity_type
                         )}`}
                       >

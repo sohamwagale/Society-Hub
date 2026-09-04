@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+@theme {
+  --radius-3xl: 10px;
+  --radius-2xl: 8px;
+  --radius-xl: 6px;
+  --radius-lg: 4px;
+  --radius-md: 4px;
+  --radius-sm: 2px;
+  --radius: 4px;
+}
+
 :root {
   color-scheme: light;
 }

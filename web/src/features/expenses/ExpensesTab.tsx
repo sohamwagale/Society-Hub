@@ -51,14 +51,14 @@ export const ExpensesTab: React.FC = () => {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 font-sans">
-      <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-6">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-100 mb-6">
         <div>
           <h3 className="font-bold text-slate-800 text-lg">Society Expenditures Ledger</h3>
           <p className="text-slate-500 text-xs mt-1">Audit expenditures logged by the management board.</p>
         </div>
         {user?.role === 'admin' && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <a
               href={expensesAPI.getExportCsvUrl()}
               target="_blank"
@@ -78,7 +78,7 @@ export const ExpensesTab: React.FC = () => {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full min-w-[500px] text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-200 text-xs uppercase text-slate-500 bg-slate-50/50">
               <th className="p-3.5 font-bold">Expense Title</th>

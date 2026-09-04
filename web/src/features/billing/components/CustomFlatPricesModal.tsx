@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, X, Tag } from 'lucide-react';
-import type { Bill, FlatAmountOverride } from '../../../types';
+import type { Bill, FlatAmountOverride, FlatAmountOverrideOut, Flat } from '../../../types';
 import { useFlatsQuery } from '../../../hooks/queries/useFlats';
 import {
   useBillFlatOverridesQuery,
@@ -14,13 +14,17 @@ interface CustomFlatPricesModalProps {
   bill: Bill | null;
 }
 
+const EMPTY_FLATS: Flat[] = [];
+const EMPTY_SERVER_OVERRIDES: FlatAmountOverrideOut[] = [];
+
 export const CustomFlatPricesModal: React.FC<CustomFlatPricesModalProps> = ({
   isOpen,
   onClose,
   bill,
 }) => {
-  const { data: flats = [] } = useFlatsQuery();
-  const { data: serverOverrides = [], isLoading } = useBillFlatOverridesQuery(bill ? bill.id : null);
+  const billId = isOpen && bill ? bill.id : null;
+  const { data: flats = EMPTY_FLATS } = useFlatsQuery();
+  const { data: serverOverrides = EMPTY_SERVER_OVERRIDES, isLoading } = useBillFlatOverridesQuery(billId);
   const updateOverridesMutation = useUpdateFlatOverridesMutation();
 
   const [overrides, setOverrides] = useState<FlatAmountOverride[]>([]);
@@ -28,10 +32,10 @@ export const CustomFlatPricesModal: React.FC<CustomFlatPricesModalProps> = ({
   const [overrideAmount, setOverrideAmount] = useState<number | ''>('');
 
   useEffect(() => {
-    if (serverOverrides) {
+    if (isOpen && billId) {
       setOverrides(serverOverrides.map((o) => ({ flat_id: o.flat_id, amount: o.amount })));
     }
-  }, [serverOverrides]);
+  }, [isOpen, billId, serverOverrides]);
 
   if (!isOpen || !bill) return null;
 
@@ -94,11 +98,11 @@ export const CustomFlatPricesModal: React.FC<CustomFlatPricesModalProps> = ({
             Override the base bill amount for specific flats in this society. Flats without overrides will pay the base amount (₹{bill.amount.toLocaleString()}).
           </p>
 
-          <div className="flex gap-2 items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
             <select
               value={selectedFlatId}
               onChange={(e) => setSelectedFlatId(e.target.value)}
-              className="flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+              className="w-full sm:flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white"
             >
               <option value="">Select Flat...</option>
               {flats.map((f) => (
@@ -108,23 +112,25 @@ export const CustomFlatPricesModal: React.FC<CustomFlatPricesModalProps> = ({
               ))}
             </select>
 
-            <input
-              type="number"
-              placeholder="Custom Price ₹"
-              min="0"
-              value={overrideAmount}
-              onChange={(e) => setOverrideAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
-              className="w-32 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
+            <div className="flex gap-2 w-full sm:w-auto">
+              <input
+                type="number"
+                placeholder="Custom Price ₹"
+                min="0"
+                value={overrideAmount}
+                onChange={(e) => setOverrideAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                className="flex-1 sm:w-32 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
 
-            <button
-              type="button"
-              onClick={handleAddOverride}
-              disabled={!selectedFlatId || overrideAmount === ''}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
-            >
-              <Plus size={14} /> Add
-            </button>
+              <button
+                type="button"
+                onClick={handleAddOverride}
+                disabled={!selectedFlatId || overrideAmount === ''}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold px-4 py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors shrink-0"
+              >
+                <Plus size={14} /> Add
+              </button>
+            </div>
           </div>
 
           {isLoading ? (

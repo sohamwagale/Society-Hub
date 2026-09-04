@@ -43,7 +43,7 @@ export const Register: React.FC = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-8 px-4 sm:py-12 sm:px-6 lg:px-8 font-sans">
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
           <div className="bg-emerald-100 p-3 rounded-2xl inline-flex text-emerald-700 shadow-sm mb-4">
             <Building2 size={36} />
@@ -70,7 +70,7 @@ export const Register: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-8 px-4 sm:py-12 sm:px-6 lg:px-8 font-sans">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="bg-indigo-600 p-3 rounded-2xl inline-flex text-white shadow-md mb-4">
           <Building2 size={36} />

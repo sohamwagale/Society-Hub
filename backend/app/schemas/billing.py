@@ -134,3 +134,18 @@ class BillPaymentOut(BaseModel):
     class Config:
         from_attributes = True
 
+
+class RazorpayOrderResponse(BaseModel):
+    razorpay_order_id: str
+    amount: float          # in rupees (for display)
+    amount_paise: int      # in paise (for SDK)
+    currency: str
+    key_id: str            # public key – safe to send to mobile
+
+
+class RazorpayVerifyRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+

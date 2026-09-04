@@ -32,7 +32,7 @@ export const BillCard: React.FC<BillCardProps> = ({
           <p className="text-slate-500 text-xs mt-1">
             {bill.description || 'Routine society maintenance charge.'}
           </p>
-          <div className="mt-3 flex gap-4 text-xs text-slate-500">
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
             <p>
               <strong>Type:</strong> <span className="capitalize">{bill.bill_type}</span>
             </p>
@@ -57,8 +57,8 @@ export const BillCard: React.FC<BillCardProps> = ({
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-slate-200/50 flex justify-between items-center">
-        <div className="flex gap-3">
+      <div className="mt-4 pt-3 border-t border-slate-200/50 flex flex-wrap gap-2 justify-between items-center">
+        <div className="flex flex-wrap gap-2">
           {user?.role === 'admin' ? (
             <>
               <button

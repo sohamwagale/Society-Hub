@@ -46,7 +46,7 @@ export const ApprovalsTab: React.FC = () => {
   const headerInfo = getHeaderInfo();
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 font-sans">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">
       <div className="pb-4 border-b border-slate-100 mb-6">
         <h3 className="font-bold text-slate-800 text-lg">{headerInfo.title}</h3>
         <p className="text-slate-500 text-xs mt-1">

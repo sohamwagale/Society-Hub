@@ -89,8 +89,8 @@ export const ComplaintsTab: React.FC = () => {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-      <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-6">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-100 mb-6">
         <div>
           <h3 className="font-bold text-slate-800 text-lg">Helpdesk Grievances</h3>
           <p className="text-slate-500 text-xs mt-1">
@@ -128,7 +128,7 @@ export const ComplaintsTab: React.FC = () => {
                     <h4 className="font-bold text-slate-800 text-base mt-2">{c.title}</h4>
                   </div>
                   <span
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                       c.status === 'open'
                         ? 'bg-red-100 text-red-700'
                         : c.status === 'in_progress'

@@ -38,26 +38,26 @@ export const ResidentsTab: React.FC = () => {
   );
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-      <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-6">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-100 mb-6">
         <div>
           <h3 className="font-bold text-slate-800 text-lg">Residents Registry</h3>
           <p className="text-slate-500 text-xs mt-1">Look up or search other verified society residents.</p>
         </div>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
             placeholder="Search name, flat, email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-xs bg-white w-64 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-xs bg-white w-full sm:w-64 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full min-w-[650px] text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-200 text-xs uppercase text-slate-500 bg-slate-50/50">
               <th className="p-3.5 font-bold">Resident</th>

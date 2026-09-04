@@ -76,8 +76,8 @@ export const DocumentsTab: React.FC = () => {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 font-sans">
-      <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-6">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-100 mb-6">
         <div>
           <h3 className="font-bold text-slate-800 text-lg">Communal Document Vault</h3>
           <p className="text-slate-500 text-xs mt-1">

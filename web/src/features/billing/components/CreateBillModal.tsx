@@ -148,11 +148,11 @@ export const CreateBillModal: React.FC<CreateBillModalProps> = ({
                   Specify custom price overrides for specific flats (e.g. penthouse rates or discounts).
                 </p>
 
-                <div className="flex gap-2 items-center">
+                <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
                   <select
                     value={selectedFlatId}
                     onChange={(e) => setSelectedFlatId(e.target.value)}
-                    className="flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                    className="w-full sm:flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white"
                   >
                     <option value="">Select Flat...</option>
                     {flats.map((f) => (
@@ -162,23 +162,25 @@ export const CreateBillModal: React.FC<CreateBillModalProps> = ({
                     ))}
                   </select>
 
-                  <input
-                    type="number"
-                    placeholder="Custom Price ₹"
-                    min="0"
-                    value={overrideAmount}
-                    onChange={(e) => setOverrideAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-32 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <input
+                      type="number"
+                      placeholder="Custom Price ₹"
+                      min="0"
+                      value={overrideAmount}
+                      onChange={(e) => setOverrideAmount(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                      className="flex-1 sm:w-32 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
 
-                  <button
-                    type="button"
-                    onClick={handleAddOverride}
-                    disabled={!selectedFlatId || overrideAmount === ''}
-                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
-                  >
-                    <Plus size={14} /> Add
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleAddOverride}
+                      disabled={!selectedFlatId || overrideAmount === ''}
+                      className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold px-4 py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors shrink-0"
+                    >
+                      <Plus size={14} /> Add
+                    </button>
+                  </div>
                 </div>
 
                 {/* Overrides Table */}

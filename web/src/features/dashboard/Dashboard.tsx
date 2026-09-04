@@ -29,7 +29,9 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : true
+  );
 
   // Global Header Notifications & Approvals State
   const [notifications, setNotifications] = useState<Notification[]>([]);

@@ -160,3 +160,18 @@ class FlatCreate(BaseModel):
     # Optional floor, defaults to '1'
     floor: str = "1"
 
+
+class FlatAssign(BaseModel):
+    user_id: str
+    flat_id: Optional[str] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+
+class PushTokenRequest(BaseModel):
+    token: str
+
+

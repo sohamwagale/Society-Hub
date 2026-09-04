@@ -143,23 +143,23 @@ export const FlatsTab: React.FC = () => {
       )}
 
       {/* Flat registry list */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 font-sans">
-        <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-6">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-100 mb-6">
           <div>
             <h3 className="font-bold text-slate-800 text-lg">Physical Units Inventory</h3>
             <p className="text-slate-500 text-xs mt-1">
               Physical society apartments automatically mapped from resident onboarding.
             </p>
           </div>
-          <div className="flex gap-3">
-            <div className="relative">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
                 placeholder="Filter flat number/block..."
                 value={flatSearch}
                 onChange={(e) => setFlatSearch(e.target.value)}
-                className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-xs bg-white w-60 focus:outline-none"
+                className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-xs bg-white w-full sm:w-60 focus:outline-none"
               />
             </div>
             <button

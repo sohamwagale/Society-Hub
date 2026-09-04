@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 # Import the direct database session factory
 from app.database import SessionLocal
 # Import the storage utility (which might point to cloud storage) to handle the 'upload' aspect of migration
-from app.utils.storage import upload_file
+from app.services.storage_service import upload_file
 # Import all models containing file URL references to be updated
 from app.models.society_expense import SocietyExpense
 from app.models.society_document import SocietyDocument
