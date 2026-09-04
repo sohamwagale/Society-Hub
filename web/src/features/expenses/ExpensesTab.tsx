@@ -70,12 +70,22 @@ export const ExpensesTab: React.FC = () => {
           <p className="text-slate-500 text-xs mt-1">Audit expenditures logged by the management board.</p>
         </div>
         {user?.role === 'admin' && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
-          >
-            <Plus size={16} /> Log Expenditure
-          </button>
+          <div className="flex gap-2">
+            <a
+              href={expensesAPI.getExportCsvUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2 rounded-lg text-xs font-semibold text-slate-700 transition-colors flex items-center gap-1.5"
+            >
+              <Paperclip size={14} /> Export CSV
+            </a>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              <Plus size={16} /> Log Expenditure
+            </button>
+          </div>
         )}
       </div>
 

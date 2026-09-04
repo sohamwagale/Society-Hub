@@ -58,6 +58,14 @@ export const billsAPI = {
     const token = tokenStorage.get();
     return `${BASE_URL}/bills/export-report?token=${encodeURIComponent(token || '')}`;
   },
+  getExportDuesCsvUrl: (): string => {
+    const token = tokenStorage.get();
+    return `${BASE_URL}/bills/export-dues-csv?token=${encodeURIComponent(token || '')}`;
+  },
+  getExportPaymentsCsvUrl: (): string => {
+    const token = tokenStorage.get();
+    return `${BASE_URL}/bills/payments/export-csv?token=${encodeURIComponent(token || '')}`;
+  },
   createRazorpayOrder: async (billId: string): Promise<{
     razorpay_order_id: string; amount: number; amount_paise: number;
     currency: string; key_id: string;

@@ -1,4 +1,4 @@
-import api from './client';
+import api, { BASE_URL, tokenStorage } from './client';
 import type { ActivityLog } from '../../types';
 
 export const activityLogAPI = {
@@ -7,5 +7,9 @@ export const activityLogAPI = {
     if (entityType) params.entity_type = entityType;
     const { data } = await api.get<ActivityLog[]>('/activity-log', { params });
     return data;
+  },
+  getExportCsvUrl: (): string => {
+    const token = tokenStorage.get();
+    return `${BASE_URL}/activity-log/export-csv?token=${encodeURIComponent(token || '')}`;
   },
 };

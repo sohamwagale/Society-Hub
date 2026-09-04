@@ -183,16 +183,32 @@ export const BillingTab: React.FC = () => {
             <h3 className="font-bold text-slate-800 text-lg">Billing &amp; Maintenance Dues</h3>
             <p className="text-slate-500 text-xs mt-1">Review active billing cycles, pay online, or audit compliance.</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2 flex-wrap">
             {user?.role === 'admin' && (
               <>
                 <a
                   href={billsAPI.getExportReportUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2 rounded-lg text-xs font-semibold text-slate-700 transition-colors flex items-center gap-1.5"
+                  className="border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 transition-colors flex items-center gap-1.5"
                 >
-                  <Download size={14} /> Export Report
+                  <Download size={14} /> PDF Report
+                </a>
+                <a
+                  href={billsAPI.getExportDuesCsvUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 transition-colors flex items-center gap-1.5"
+                >
+                  <Download size={14} /> Unpaid Dues (CSV)
+                </a>
+                <a
+                  href={billsAPI.getExportPaymentsCsvUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 transition-colors flex items-center gap-1.5"
+                >
+                  <Download size={14} /> Receipts (CSV)
                 </a>
                 <button
                   onClick={() => setModalType('bill')}

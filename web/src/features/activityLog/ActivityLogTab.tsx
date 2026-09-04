@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, RefreshCw, Filter, ChevronLeft, ChevronRight, Activity } from 'lucide-react';
+import { ShieldCheck, RefreshCw, Filter, ChevronLeft, ChevronRight, Activity, Download } from 'lucide-react';
 import type { ActivityLog } from '../../types';
 import { activityLogAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
@@ -58,17 +58,10 @@ export const ActivityLogTab: React.FC = () => {
       case 'billing':
       case 'bill':
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'resident':
-      case 'user':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'complaint':
+      case 'expense':
         return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'announcement':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
       case 'reimbursement':
         return 'bg-rose-50 text-rose-700 border-rose-200';
-      case 'document':
-        return 'bg-cyan-50 text-cyan-700 border-cyan-200';
       default:
         return 'bg-slate-100 text-slate-700 border-slate-200';
     }
@@ -100,15 +93,22 @@ export const ActivityLogTab: React.FC = () => {
               }}
               className="bg-transparent text-slate-700 font-medium focus:outline-none cursor-pointer"
             >
-              <option value="">All Entities</option>
+              <option value="">All</option>
               <option value="billing">Billing</option>
-              <option value="resident">Residents</option>
-              <option value="complaint">Complaints</option>
-              <option value="announcement">Announcements</option>
+              <option value="expense">Expenses</option>
               <option value="reimbursement">Reimbursements</option>
-              <option value="document">Documents</option>
             </select>
           </div>
+
+          <a
+            href={activityLogAPI.getExportCsvUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-2 rounded-lg transition-colors"
+          >
+            <Download size={14} />
+            Export CSV
+          </a>
 
           <button
             onClick={loadLogs}

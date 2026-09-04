@@ -1,4 +1,4 @@
-import api, { BASE_URL } from './client';
+import api, { BASE_URL, tokenStorage } from './client';
 import type { SocietyExpense, SocietyExpenseCreate } from '../../types';
 
 export const expensesAPI = {
@@ -27,5 +27,9 @@ export const expensesAPI = {
   getDocumentUrl: (path: string): string => {
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return BASE_URL.replace('/api', '') + path;
+  },
+  getExportCsvUrl: (): string => {
+    const token = tokenStorage.get();
+    return `${BASE_URL}/expenses/export-csv?token=${encodeURIComponent(token || '')}`;
   },
 };
