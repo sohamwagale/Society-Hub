@@ -5,6 +5,8 @@ import type {
   BillPayment,
   PayBillRequest,
   BillResidentStatus,
+  FlatAmountOverride,
+  FlatAmountOverrideOut,
 } from '../../types';
 
 export const billsAPI = {
@@ -21,6 +23,14 @@ export const billsAPI = {
   },
   getResidentStatus: async (id: string): Promise<BillResidentStatus[]> => {
     const { data } = await api.get<BillResidentStatus[]>(`/bills/${encodeURIComponent(id)}/residents`);
+    return data;
+  },
+  getFlatOverrides: async (id: string): Promise<FlatAmountOverrideOut[]> => {
+    const { data } = await api.get<FlatAmountOverrideOut[]>(`/bills/${encodeURIComponent(id)}/overrides`);
+    return data;
+  },
+  updateFlatOverrides: async (id: string, overrides: FlatAmountOverride[]): Promise<Bill> => {
+    const { data } = await api.put<Bill>(`/bills/${encodeURIComponent(id)}`, { flat_overrides: overrides });
     return data;
   },
   create: async (bill: BillCreate): Promise<Bill> => {

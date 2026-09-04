@@ -98,6 +98,14 @@ export interface FlatAmountOverride {
   amount: number;
 }
 
+export interface FlatAmountOverrideOut {
+  flat_id: string;
+  flat_number?: string;
+  block?: string;
+  floor?: string;
+  amount: number;
+}
+
 export interface BillCreate {
   title: string;
   description?: string;

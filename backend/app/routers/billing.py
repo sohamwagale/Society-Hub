@@ -1002,6 +1002,31 @@ async def upload_receipt(
     return {"receipt_path": payment.receipt_path}
 
 
+# GET endpoint to list custom flat price overrides for a bill (Admin only)
+@router.get("/{bill_id}/overrides")
+def get_bill_overrides(
+    bill_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    bill = db.query(Bill).filter(Bill.id == bill_id).first()
+    if not bill:
+        raise HTTPException(status_code=404, detail="Bill record not found")
+
+    overrides = db.query(BillFlatAmount).filter(BillFlatAmount.bill_id == bill_id).all()
+    results = []
+    for o in overrides:
+        flat = db.query(Flat).filter(Flat.id == o.flat_id).first()
+        results.append({
+            "flat_id": o.flat_id,
+            "flat_number": flat.flat_number if flat else None,
+            "block": flat.block if flat else None,
+            "floor": flat.floor if flat else None,
+            "amount": o.amount,
+        })
+    return results
+
+
 # ── Bill Configuration Updates ──
 
 # PUT endpoint to modify existing bill details (Admin only)
@@ -1017,15 +1042,29 @@ async def update_bill(
     if not bill:
         raise HTTPException(status_code=404, detail="Bill record not found")
 
+    update_data = payload.model_dump(exclude_unset=True)
+    if "flat_overrides" in update_data:
+        overrides_data = update_data.pop("flat_overrides")
+        db.query(BillFlatAmount).filter(BillFlatAmount.bill_id == bill_id).delete()
+        if overrides_data:
+            for item in overrides_data:
+                db.add(BillFlatAmount(
+                    bill_id=bill_id,
+                    flat_id=item["flat_id"],
+                    amount=item["amount"]
+                ))
+
     # iterate through patch payload
-    for field, value in payload.model_dump(exclude_none=True).items():
+    for field, value in update_data.items():
+        if value is None:
+            continue
         if field == "bill_type":
             # Cast type string to enum
             setattr(bill, field, BillType(value))
         else:
             # apply standard fields (title, amount, due_date, etc.)
             setattr(bill, field, value)
-    
+
     # save changes
     db.commit()
     # reload fresh state

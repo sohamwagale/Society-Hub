@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store';
 import CreateBillModal from './components/CreateBillModal';
 import UploadReceiptModal from './components/UploadReceiptModal';
 import PaymentSuccessModal from './components/PaymentSuccessModal';
+import CustomFlatPricesModal from './components/CustomFlatPricesModal';
 import { BillCard } from './components/BillCard';
 import { FlatAuditPanel } from './components/FlatAuditPanel';
 import { toast } from '../../components/Toast';
@@ -38,6 +39,7 @@ export const BillingTab: React.FC = () => {
 
   // Modals & sub-state
   const [modalType, setModalType] = useState<string | null>(null);
+  const [customPricesBill, setCustomPricesBill] = useState<Bill | null>(null);
   const [isCreateBillSuccess, setIsCreateBillSuccess] = useState(false);
   const [newBill, setNewBill] = useState<BillCreate>({
     title: '',
@@ -218,6 +220,7 @@ export const BillingTab: React.FC = () => {
                     setModalType('receipt');
                   }}
                   onDeleteBill={handleDeleteBill}
+                  onOpenCustomPrices={(b) => setCustomPricesBill(b)}
                 />
               ))
             )}
@@ -248,6 +251,12 @@ export const BillingTab: React.FC = () => {
         onClose={() => setModalType(null)}
         onSubmit={handleUploadBillReceipt}
         setBillReceiptFile={setBillReceiptFile}
+      />
+
+      <CustomFlatPricesModal
+        isOpen={!!customPricesBill}
+        onClose={() => setCustomPricesBill(null)}
+        bill={customPricesBill}
       />
 
       <PaymentSuccessModal

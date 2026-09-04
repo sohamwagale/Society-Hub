@@ -14,6 +14,18 @@ class FlatAmountOverride(BaseModel):
     amount: float
 
 
+class FlatAmountOverrideOut(BaseModel):
+    flat_id: str
+    flat_number: Optional[str] = None
+    block: Optional[str] = None
+    floor: Optional[str] = None
+    amount: float
+
+    class Config:
+        from_attributes = True
+
+
+
 # ---------- Bill Schemas ----------
 # Schema for creating a new bill entry
 class BillCreate(BaseModel):
@@ -82,6 +94,8 @@ class BillUpdate(BaseModel):
     due_date: Optional[date] = None
     # Optional visibility toggle
     is_active: Optional[bool] = None
+    # Optional list of flat-specific price overrides
+    flat_overrides: Optional[List[FlatAmountOverride]] = None
 
 
 # ---------- Bill Payment Schemas ----------

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Trash2 } from 'lucide-react';
+import { Download, Trash2, Tag } from 'lucide-react';
 import type { Bill, BillPayment, User } from '../../../types';
 import { billsAPI } from '../../../services/api';
 
@@ -11,6 +11,7 @@ interface BillCardProps {
   onRazorpayCheckout: (bill: Bill) => void;
   onOpenReceiptUpload: (billId: string) => void;
   onDeleteBill: (billId: string) => void;
+  onOpenCustomPrices?: (bill: Bill) => void;
 }
 
 export const BillCard: React.FC<BillCardProps> = ({
@@ -21,6 +22,7 @@ export const BillCard: React.FC<BillCardProps> = ({
   onRazorpayCheckout,
   onOpenReceiptUpload,
   onDeleteBill,
+  onOpenCustomPrices,
 }) => {
   return (
     <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex flex-col justify-between relative group hover:border-slate-300 transition-all">
@@ -56,14 +58,24 @@ export const BillCard: React.FC<BillCardProps> = ({
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-200/50 flex justify-between items-center">
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           {user?.role === 'admin' ? (
-            <button
-              onClick={() => onSelectAudit(bill.id)}
-              className="text-xs text-indigo-600 font-bold hover:underline"
-            >
-              View Flat Audits
-            </button>
+            <>
+              <button
+                onClick={() => onSelectAudit(bill.id)}
+                className="text-xs text-indigo-600 font-bold hover:underline"
+              >
+                View Flat Audits
+              </button>
+              {onOpenCustomPrices && (
+                <button
+                  onClick={() => onOpenCustomPrices(bill)}
+                  className="text-xs text-violet-700 font-bold hover:underline flex items-center gap-1"
+                >
+                  <Tag size={12} /> Custom Prices
+                </button>
+              )}
+            </>
           ) : (
             <>
               {bill.payment_status !== 'paid' && (
