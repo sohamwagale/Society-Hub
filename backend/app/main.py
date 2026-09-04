@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
+import app.models  # Register all SQLAlchemy models for metadata creation
 from app.database import engine, Base
 from app.core.config import UPLOADS_DIR
 from app.api import (
@@ -24,6 +25,13 @@ from app.api import (
 
 app = FastAPI(title="Apartment Society Management API", version="2.0")
 
+
+@app.on_event("startup")
+def on_startup():
+    """Ensure database tables exist on application startup."""
+    Base.metadata.create_all(bind=engine)
+
+
 # Configure Cross-Origin Resource Sharing (CORS) with credentials support
 allowed_origins = [
     "http://localhost:5173",
@@ -32,6 +40,7 @@ allowed_origins = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "https://sohamwagale.github.io"
 ]
 env_origins = os.getenv("CORS_ORIGINS")
 if env_origins:

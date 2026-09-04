@@ -4,3 +4,11 @@ app-release.apk
 
 *.db
 
+.env.example
+.env
+
+backend/postgres_dump.sql
+backend/docker-compose.yml
+backend/.env
+
+web/dist  

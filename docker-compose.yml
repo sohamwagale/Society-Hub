@@ -1,0 +1,86 @@
+services:
+  # ==========================================================
+  # Database Service (PostgreSQL)
+  # ==========================================================
+  db:
+    image: postgres:15-alpine
+    container_name: societyhub_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      POSTGRES_DB: ${POSTGRES_DB:-society_hub}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - societyhub-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-society_hub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================
+  # Backend API Service (FastAPI / Python)
+  # ==========================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: societyhub_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@db:5432/${POSTGRES_DB:-society_hub}
+      SECRET_KEY: ${SECRET_KEY:-0cMoFWAW6XlCkoqE0vzTfkmCB7eNQvZwfHvDc60C7dqnYkeTQjMdlQixaO4vuwtNxMP8EqiRiz6TFJTWJIZ_fQ}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      COOKIE_SECURE: "False"
+      COOKIE_SAMESITE: "lax"
+      REFRESH_COOKIE_SAMESITE: "lax"
+      CORS_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/app:/app/app
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - societyhub-network
+
+  # ==========================================================
+  # Frontend Web App (React / Vite / Node)
+  # ==========================================================
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: societyhub_frontend
+    restart: unless-stopped
+    environment:
+      VITE_BACKEND_URL: http://backend:8000
+      VITE_API_BASE_URL: /api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - societyhub-network
+
+# ==========================================================
+# Named Volumes & Networks
+# ==========================================================
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  societyhub-network:
+    driver: bridge
