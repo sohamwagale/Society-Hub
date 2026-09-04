@@ -29,6 +29,7 @@ from app.services.notification_service import create_notification
 # Import notification type enum
 from app.models.notification import NotificationType
 
+
 # Initialize router with relevant prefix and tag
 router = APIRouter(prefix="/api/complaints", tags=["Complaints"])
 
@@ -44,25 +45,18 @@ def create_complaint(
 ):
     # Initialize a new Complaint record
     complaint = Complaint(
-        # Generate a unique tracking ID
         id=str(uuid.uuid4()),
-        # Link to the user's specific society
         society_id=current_user.society_id,
-        # Link to the filing user
         user_id=current_user.id,
-        # Cast category input to internal Enum
         category=ComplaintCategory(data.category),
-        # Descriptive title and detailed body
         title=data.title,
         description=data.description,
-        # Set initial status to OPEN
         status=ComplaintStatus.OPEN,
     )
-    # stage and commit the record
     db.add(complaint)
     db.commit()
-    # reload and return the created object
     db.refresh(complaint)
+
     return complaint
 
 

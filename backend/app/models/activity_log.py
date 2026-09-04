@@ -20,6 +20,8 @@ class ActivityLog(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     # Foreign key link to the user who performed the action
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    # Foreign key link to the society this log entry belongs to (for scoped queries)
+    society_id = Column(String, ForeignKey("societies.id"), nullable=True)
     # Short string describing the action performed (e.g. "bill_created", "complaint_resolved")
     action = Column(String(100), nullable=False)
     # The type of record affected by this action (e.g. "bill", "complaint")

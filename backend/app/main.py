@@ -42,11 +42,11 @@ _uploads_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 os.makedirs(_uploads_dir, exist_ok=True)
 app.mount('/uploads', StaticFiles(directory=_uploads_dir), name='uploads')
 
+
 @app.get("/")
 def root():
     return {
-        "message": "Apartment Society Management API", 
-        "version": "2.0", 
+        "message": "Apartment Society Management API",
+        "version": "2.0",
         "docs": "/docs"
-        }
-
+    }

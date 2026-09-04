@@ -21,6 +21,7 @@ from app.utils.auth import get_current_user, require_role
 # Import cloud storage utilities for managing binary files
 from app.utils.storage import upload_file, delete_file
 
+
 # Initialize the router with relevant prefix and grouping tags
 router = APIRouter(prefix="/api/documents", tags=["Society Documents"])
 
@@ -87,6 +88,7 @@ async def upload_document(
     db.add(doc)
     db.commit()
     db.refresh(doc)
+
     return _to_out(doc)
 
 
@@ -161,6 +163,7 @@ def approve_document(
     # commit changes
     db.commit()
     db.refresh(doc)
+
     return _to_out(doc)
 
 
@@ -185,4 +188,5 @@ def delete_document(
     db.delete(doc)
     # finalize
     db.commit()
+
     return {"detail": "Document and associated assets successfully purged"}

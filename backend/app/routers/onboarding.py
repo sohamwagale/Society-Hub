@@ -20,6 +20,7 @@ from app.schemas.user import PendingUserOut
 # Import authentication and security utilities
 from app.utils.auth import get_current_user, require_role, hash_password, create_access_token
 
+
 # Initialize the router for onboarding-related workflows
 router = APIRouter(prefix="/api/onboarding", tags=["Onboarding"])
 
@@ -218,6 +219,7 @@ def join_society(
     db.commit()
     # refresh instance local data
     db.refresh(current_user)
+
     # return successful submission summary
     return {"detail": "Society join request submitted successfully", "user_id": current_user.id}
 

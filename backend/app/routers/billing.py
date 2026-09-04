@@ -4,10 +4,11 @@ import os
 import uuid
 # Import date/datetime for handling bill due dates and payment timestamps
 from datetime import date, datetime
-# Import Optional for type hinting nullable fields
-from typing import Optional
+import csv
+import io
 # Import FastAPI components for routing, dependencies, errors, and file uploads
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import StreamingResponse
 # Import SQLAlchemy Session for DB operations
 from sqlalchemy.orm import Session
 # Import the database session utility
@@ -26,6 +27,8 @@ from app.utils.storage import upload_file
 from app.services.notification_service import notify_all_residents, create_notification
 # Import notification type enum
 from app.models.notification import NotificationType
+# Import activity log service
+from app.services.activity_log_service import log_activity
 
 # Initialize the router with prefix and tags
 router = APIRouter(prefix="/api/bills", tags=["Billing"])
@@ -215,6 +218,16 @@ def create_bill(
         society_id=admin.society_id,
     )
 
+    log_activity(
+        db,
+        user_id=admin.id,
+        society_id=admin.society_id,
+        action="Created Bill Cycle",
+        entity_type="billing",
+        entity_id=bill.id,
+        details=f"Created bill '{bill.title}' of Rs.{bill.amount:,.2f} due on {bill.due_date}",
+    )
+
     # Validate model and inject initial status for response
     result = BillOut.model_validate(bill)
     result.payment_status = "due"
@@ -260,6 +273,144 @@ def list_bills(
 
 
 # ── Advanced Report Exporting ──
+
+@router.get("/export-dues-csv")
+def export_unpaid_dues_csv(
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Generate a CSV ledger of all unpaid dues flat-by-flat for society auditors."""
+    from jose import jwt, JWTError
+    from app.utils.auth import SECRET_KEY, ALGORITHM
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication token required (?token=)")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    admin = db.query(User).filter(User.id == user_id).first()
+    if not admin or admin.role.value != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required for report export")
+
+    active_bills = (
+        db.query(Bill)
+        .filter(Bill.is_active == True, Bill.society_id == admin.society_id)
+        .order_by(Bill.due_date.desc())
+        .all()
+    )
+
+    flats = (
+        db.query(Flat)
+        .filter(Flat.society_id == admin.society_id)
+        .order_by(Flat.block, Flat.flat_number)
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Flat Number", "Block", "Floor", "Bill Title", "Bill Amount (INR)", "Due Date", "Payment Status"])
+
+    for flat in flats:
+        flat_users = [u for u in flat.residents if u.is_fully_approved]
+        flat_user_ids = [u.id for u in flat_users]
+
+        for bill in active_bills:
+            override = db.query(BillFlatAmount).filter(
+                BillFlatAmount.bill_id == bill.id,
+                BillFlatAmount.flat_id == flat.id
+            ).first()
+
+            if override and override.amount == 0:
+                continue
+
+            bill_amount = override.amount if override else bill.amount
+
+            payment = db.query(BillPayment).filter(
+                BillPayment.bill_id == bill.id,
+                BillPayment.user_id.in_(flat_user_ids)
+            ).first() if flat_user_ids else None
+
+            status_str = "Paid" if payment else ("Overdue" if bill.due_date < date.today() else "Unpaid")
+
+            writer.writerow([
+                flat.flat_number,
+                flat.block,
+                flat.floor,
+                bill.title,
+                f"{bill_amount:.2f}",
+                bill.due_date.strftime("%Y-%m-%d") if bill.due_date else "",
+                status_str,
+            ])
+
+    buffer = io.BytesIO(output.getvalue().encode("utf-8-sig"))
+    return StreamingResponse(
+        buffer,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="unpaid_dues_ledger_{date.today().isoformat()}.csv"'},
+    )
+
+
+@router.get("/payments/export-csv")
+def export_payment_receipts_csv(
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Generate a CSV export of all recorded payment receipts and transactions."""
+    from jose import jwt, JWTError
+    from app.utils.auth import SECRET_KEY, ALGORITHM
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication token required (?token=)")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    admin = db.query(User).filter(User.id == user_id).first()
+    if not admin or admin.role.value != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required for payment report export")
+
+    payments = (
+        db.query(BillPayment)
+        .join(Bill, BillPayment.bill_id == Bill.id)
+        .filter(Bill.society_id == admin.society_id)
+        .order_by(BillPayment.paid_at.desc())
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Payment ID", "Bill Title", "Payer Name", "Flat Number", "Amount Paid (INR)", "Payment Method", "Transaction Ref", "Paid At (UTC)"])
+
+    for p in payments:
+        payer = p.user
+        flat_label = f"{payer.flat.block}-{payer.flat.flat_number}" if payer and payer.flat else "Unassigned"
+        writer.writerow([
+            p.id,
+            p.bill.title if p.bill else "",
+            payer.name if payer else "Unknown",
+            flat_label,
+            f"{p.amount:.2f}",
+            p.payment_method or "Online",
+            p.transaction_ref or "",
+            p.paid_at.strftime("%Y-%m-%d %H:%M:%S") if p.paid_at else "",
+        ])
+
+    buffer = io.BytesIO(output.getvalue().encode("utf-8-sig"))
+    return StreamingResponse(
+        buffer,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="payment_receipts_{date.today().isoformat()}.csv"'},
+    )
+
 
 # GET endpoint to generate a PDF summary of billed and unpaid amounts
 @router.get("/export-report")
