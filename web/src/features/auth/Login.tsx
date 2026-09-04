@@ -13,7 +13,7 @@ export const Login: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const from = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/';
+  const from = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/dashboard';
 
   useEffect(() => {
     if (isAuthenticated && user) {

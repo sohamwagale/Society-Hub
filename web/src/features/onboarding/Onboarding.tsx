@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store';
 import { societyAPI, onboardingAPI } from '../../services/api';
 import type { Society, SocietyFlatSummary, CreateSocietyFlat } from '../../types';
-import { Building2, LogOut, Clock, Home, Landmark } from 'lucide-react';
+import { Building2, LogOut, Home, Landmark } from 'lucide-react';
+import { PendingApprovalNotice } from './components/PendingApprovalNotice';
+import { JoinSocietyForm } from './components/JoinSocietyForm';
+import { CreateSocietyForm } from './components/CreateSocietyForm';
 
 export const Onboarding: React.FC = () => {
   const { user, logout, refreshUser } = useAuthStore();
@@ -117,7 +120,7 @@ export const Onboarding: React.FC = () => {
         flats: generatedFlats,
       });
       await refreshUser();
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { detail?: string } } };
       setCreateError(errorObj.response?.data?.detail || 'Failed to create society.');
@@ -133,51 +136,12 @@ export const Onboarding: React.FC = () => {
 
   // If user is pending approval
   if (user?.society_id && !user.is_fully_approved) {
-    const getPendingMessage = () => {
-      if (user.resident_type === 'owner_family' || user.resident_type === 'renter') {
-        return 'Your request to join the flat has been registered. Please contact the primary flat owner to approve your account.';
-      }
-      if (user.resident_type === 'renter_family') {
-        return 'Your request to join the flat has been registered. Please contact the primary tenant to approve your account.';
-      }
-      return 'Your request to join the society flat has been registered. Please contact the society committee administrator to approve your account.';
-    };
-
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-white py-8 px-4 border border-slate-200 shadow-md rounded-2xl sm:px-10 text-center">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-amber-100 text-amber-600 mb-6">
-              <Clock size={32} />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Verification Pending</h2>
-            <p className="mt-3 text-sm text-slate-500 leading-relaxed">
-              {getPendingMessage()}
-            </p>
-            <div className="mt-6 p-4 bg-slate-50 rounded-xl text-left text-xs text-slate-600 space-y-1.5 border border-slate-100">
-              <p><strong>Name:</strong> {user.name}</p>
-              <p><strong>Email:</strong> {user.email}</p>
-              {user.flat_number && <p><strong>Flat:</strong> Flat {user.flat_number} ({user.block} Block)</p>}
-              {user.resident_type && <p><strong>Role:</strong> <span className="capitalize">{user.resident_type.replace('_', ' ')}</span></p>}
-            </div>
-
-            <div className="mt-8 space-y-3">
-              <button
-                onClick={() => refreshUser()}
-                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-              >
-                Refresh Status
-              </button>
-              <button
-                onClick={handleLogout}
-                className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-              >
-                <LogOut size={16} /> Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PendingApprovalNotice
+        user={user}
+        onRefresh={refreshUser}
+        onLogout={handleLogout}
+      />
     );
   }
 
@@ -236,223 +200,45 @@ export const Onboarding: React.FC = () => {
           )}
 
           {mode === 'join' && (
-            <form onSubmit={handleJoinSubmit} className="space-y-6">
-              <div className="flex justify-between items-center pb-4 border-b border-slate-100">
-                <h3 className="text-lg font-bold text-slate-800">Join a Resident Unit</h3>
-                <button
-                  type="button"
-                  onClick={() => setMode('select')}
-                  className="text-xs text-indigo-600 font-semibold hover:underline"
-                >
-                  Back
-                </button>
-              </div>
-
-              {joinError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
-                  {joinError}
-                </div>
-              )}
-
-              {/* Society Selection */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Society Name</label>
-                <select
-                  disabled={loadingSocieties}
-                  value={selectedSocietyId}
-                  onChange={(e) => setSelectedSocietyId(e.target.value)}
-                  className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="">-- Select Society --</option>
-                  {societies.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Flat Selection */}
-              {selectedSocietyId && (
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Select Flat</label>
-                  {loadingFlats ? (
-                    <div className="text-xs text-slate-500">Loading society flats...</div>
-                  ) : (
-                    <select
-                      value={selectedFlatId}
-                      onChange={(e) => setSelectedFlatId(e.target.value)}
-                      className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="">-- Select Flat Number --</option>
-                      {flats.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.block} Block - Flat {f.flat_number} (Floor {f.floor})
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
-
-              {/* Resident Type */}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Resident Type</label>
-                <select
-                  value={residentType}
-                  onChange={(e) => setResidentType(e.target.value)}
-                  className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="owner">Owner</option>
-                  <option value="owner_family">Owner Family Member</option>
-                  <option value="renter">Tenant (Renter)</option>
-                  <option value="renter_family">Tenant Family Member</option>
-                </select>
-              </div>
-
-              {/* Identity fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Aadhar Number{residentType === 'owner' ? '' : ' (Optional)'}
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={12}
-                    value={aadhar}
-                    onChange={(e) => setAadhar(e.target.value.replace(/\D/g, ''))}
-                    placeholder="12-digit Aadhar"
-                    className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    PAN Card Number{residentType === 'owner' ? '' : ' (Optional)'}
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={10}
-                    value={pan}
-                    onChange={(e) => setPan(e.target.value.toUpperCase())}
-                    placeholder="ABCDE1234F"
-                    className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <button
-                  type="submit"
-                  disabled={submittingJoin || !selectedFlatId}
-                  className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                >
-                  {submittingJoin ? 'Submitting request...' : 'Submit Joining Application'}
-                </button>
-              </div>
-            </form>
+            <JoinSocietyForm
+              onBack={() => setMode('select')}
+              onSubmit={handleJoinSubmit}
+              joinError={joinError}
+              loadingSocieties={loadingSocieties}
+              societies={societies}
+              selectedSocietyId={selectedSocietyId}
+              setSelectedSocietyId={setSelectedSocietyId}
+              loadingFlats={loadingFlats}
+              flats={flats}
+              selectedFlatId={selectedFlatId}
+              setSelectedFlatId={setSelectedFlatId}
+              residentType={residentType}
+              setResidentType={setResidentType}
+              aadhar={aadhar}
+              setAadhar={setAadhar}
+              pan={pan}
+              setPan={setPan}
+              submittingJoin={submittingJoin}
+            />
           )}
 
           {mode === 'create' && (
-            <form onSubmit={handleCreateSubmit} className="space-y-6">
-              <div className="flex justify-between items-center pb-4 border-b border-slate-100">
-                <h3 className="text-lg font-bold text-slate-800">Configure New Society</h3>
-                <button
-                  type="button"
-                  onClick={() => setMode('select')}
-                  className="text-xs text-indigo-600 font-semibold hover:underline"
-                >
-                  Back
-                </button>
-              </div>
-
-              {createError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
-                  {createError}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Society Name</label>
-                <input
-                  type="text"
-                  required
-                  value={newSocietyName}
-                  onChange={(e) => setNewSocietyName(e.target.value)}
-                  placeholder="e.g. Marvel Heights Co-op Society"
-                  className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Address</label>
-                <textarea
-                  value={newSocietyAddress}
-                  onChange={(e) => setNewSocietyAddress(e.target.value)}
-                  placeholder="Full physical address"
-                  rows={2}
-                  className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="border-t border-slate-100 pt-4 space-y-4">
-                <h4 className="text-sm font-bold text-slate-800">Unit Generator Settings</h4>
-                <p className="text-xs text-slate-500">
-                  We will automatically populate the database with flats according to the configuration below.
-                </p>
-
-                {/* Blocks List */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Blocks / Wings (Comma separated)
-                  </label>
-                  <input
-                    type="text"
-                    value={blocksList.join(', ')}
-                    onChange={(e) => setBlocksList(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                    placeholder="A, B, C"
-                    className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Floors per Block</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={50}
-                      value={floorsCount || ''}
-                      onChange={(e) => setFloorsCount(e.target.value === '' ? 1 : Math.max(1, parseInt(e.target.value) || 1))}
-                      className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Flats per Floor</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={flatsPerFloor || ''}
-                      onChange={(e) => setFlatsPerFloor(e.target.value === '' ? 1 : Math.max(1, parseInt(e.target.value) || 1))}
-                      className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg text-xs text-slate-500">
-                  This will generate a total of <strong className="text-indigo-600 font-bold">{blocksList.length * floorsCount * flatsPerFloor} flats</strong>. 
-                  (e.g., A-101 to {blocksList[blocksList.length - 1] || 'A'}-{floorsCount}{flatsPerFloor.toString().padStart(2, '0')})
-                </div>
-              </div>
-
-              <div>
-                <button
-                  type="submit"
-                  disabled={submittingCreate || blocksList.length === 0}
-                  className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                >
-                  {submittingCreate ? 'Generating society units...' : 'Deploy Society'}
-                </button>
-              </div>
-            </form>
+            <CreateSocietyForm
+              onBack={() => setMode('select')}
+              onSubmit={handleCreateSubmit}
+              createError={createError}
+              newSocietyName={newSocietyName}
+              setNewSocietyName={setNewSocietyName}
+              newSocietyAddress={newSocietyAddress}
+              setNewSocietyAddress={setNewSocietyAddress}
+              blocksList={blocksList}
+              setBlocksList={setBlocksList}
+              floorsCount={floorsCount}
+              setFloorsCount={setFloorsCount}
+              flatsPerFloor={flatsPerFloor}
+              setFlatsPerFloor={setFlatsPerFloor}
+              submittingCreate={submittingCreate}
+            />
           )}
         </div>
       </div>

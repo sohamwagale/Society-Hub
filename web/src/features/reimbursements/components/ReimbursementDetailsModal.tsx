@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Paperclip, CheckCircle, XCircle, DollarSign, User, Calendar, CreditCard } from 'lucide-react';
+import { X, Paperclip, CheckCircle, XCircle } from 'lucide-react';
 import type { ReimbursementRequest } from '../../../types';
 import { reimbursementsAPI } from '../../../services/api';
 

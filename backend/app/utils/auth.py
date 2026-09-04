@@ -17,13 +17,19 @@ from app.database import get_db
 # Import User model for type casting
 from app.models.user import User
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 # ── Security Configuration ──
-# SECRET_KEY used to sign JWTs (MUST be changed and kept confidential in production)
-SECRET_KEY = "apartment-society-secret-key-change-in-production"
+# SECRET_KEY used to sign JWTs (loaded from environment)
+SECRET_KEY = os.getenv("SECRET_KEY")
 # Hashing algorithm for the tokens
-ALGORITHM = "HS256"
-# Standard token TTL: Sessions remain valid for 24 hours
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+# Standard token TTL: Sessions remain valid for 24 hours (default 1440 minutes)
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
 # Initialize the password hashing context using the bcrypt algorithm
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
