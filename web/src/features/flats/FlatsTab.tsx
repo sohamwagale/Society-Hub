@@ -1,18 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Clock, Check, X, Search, Plus } from 'lucide-react';
-import type { Flat, PendingUser, ResidentInfo } from '../../types';
-import { flatsAPI, residentsAPI, onboardingAPI } from '../../services/api';
+import type { Flat, ResidentInfo } from '../../types';
 import { useAuthStore } from '../../store';
 import CreateFlatModal from './components/CreateFlatModal';
 import AssignResidentModal from './components/AssignResidentModal';
 import { toast } from '../../components/Toast';
 import { confirmDialog } from '../../components/ConfirmModal';
+import { useFlatsQuery, useCreateFlatMutation, useAssignFlatMutation } from '../../hooks/queries/useFlats';
+import { usePendingApprovalsQuery, useApproveResidentMutation } from '../../hooks/queries/useApprovals';
+import { useResidentsQuery } from '../../hooks/queries/useResidents';
 
 export const FlatsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [flats, setFlats] = useState<Flat[]>([]);
-  const [pendingApprovals, setPendingApprovals] = useState<PendingUser[]>([]);
-  const [activeResidents, setActiveResidents] = useState<ResidentInfo[]>([]);
+  const { data: rawFlats = [] } = useFlatsQuery();
+  const flats = [...rawFlats].sort((a, b) => a.flat_number.localeCompare(b.flat_number));
+  const { data: pendingApprovals = [] } = usePendingApprovalsQuery();
+  const { data: activeResidents = [] } = useResidentsQuery();
+
+  const createFlatMutation = useCreateFlatMutation();
+  const approveResidentMutation = useApproveResidentMutation();
+
   const [modalType, setModalType] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -24,30 +31,10 @@ export const FlatsTab: React.FC = () => {
   const [residentAssignSearch, setResidentAssignSearch] = useState('');
   const [flatSearch, setFlatSearch] = useState('');
 
-  const loadData = async () => {
-    try {
-      const [flatsData, pending, residents] = await Promise.all([
-        flatsAPI.list(),
-        onboardingAPI.pendingApprovals(),
-        residentsAPI.list(),
-      ]);
-      setFlats(flatsData.sort((a, b) => a.flat_number.localeCompare(b.flat_number)));
-      setPendingApprovals(pending);
-      setActiveResidents(residents);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [user]);
-
   const handleApprovePendingUser = async (id: string, approve: boolean) => {
     try {
-      await onboardingAPI.approve(id, approve);
+      await approveResidentMutation.mutateAsync({ userId: id, approve });
       toast.success(approve ? 'User approved!' : 'Application rejected.');
-      loadData();
     } catch {
       toast.error('Verification decision failed.');
     }
@@ -57,7 +44,7 @@ export const FlatsTab: React.FC = () => {
     e.preventDefault();
     if (!newFlatNumber || !newFlatBlock || !newFlatFloor) return;
     try {
-      await flatsAPI.create({ flat_number: newFlatNumber, block: newFlatBlock, floor: newFlatFloor });
+      await createFlatMutation.mutateAsync({ flat_number: newFlatNumber, block: newFlatBlock, floor: newFlatFloor });
       setIsSuccess(true);
       toast.success('Flat unit registered!');
       setTimeout(() => {
@@ -66,22 +53,22 @@ export const FlatsTab: React.FC = () => {
         setNewFlatNumber('');
         setNewFlatBlock('');
         setNewFlatFloor('');
-        loadData();
       }, 1000);
     } catch {
       toast.error('Failed to register flat.');
     }
   };
 
+  const assignFlatMutation = useAssignFlatMutation();
+
   const handleAssignResident = async (residentId: string) => {
     if (!selectedFlatForAssign) return;
     try {
-      await flatsAPI.assignUser(residentId, selectedFlatForAssign.id);
+      await assignFlatMutation.mutateAsync({ userId: residentId, flatId: selectedFlatForAssign.id });
       toast.success('Resident linked successfully!');
       setModalType(null);
       setSelectedFlatForAssign(null);
       setResidentAssignSearch('');
-      loadData();
     } catch {
       toast.error('Failed to assign resident.');
     }
@@ -94,9 +81,8 @@ export const FlatsTab: React.FC = () => {
       confirmText: 'Unlink Resident',
       onConfirm: async () => {
         try {
-          await flatsAPI.assignUser(resident.id, null);
+          await assignFlatMutation.mutateAsync({ userId: resident.id, flatId: null });
           toast.success('Resident unlinked successfully!');
-          loadData();
         } catch {
           toast.error('Failed to unlink resident.');
         }

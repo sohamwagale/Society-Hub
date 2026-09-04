@@ -1,36 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Check, X } from 'lucide-react';
-import type { PendingUser } from '../../types';
-import { onboardingAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import { toast } from '../../components/Toast';
+import { usePendingApprovalsQuery, useApproveResidentMutation } from '../../hooks/queries/useApprovals';
 
 export const ApprovalsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [pendingApprovals, setPendingApprovals] = useState<PendingUser[]>([]);
-
   const canViewApprovals = user?.role === 'admin' || user?.resident_type === 'owner' || user?.resident_type === 'renter';
-
-  const loadApprovals = async () => {
-    try {
-      const queue = await onboardingAPI.pendingApprovals();
-      setPendingApprovals(queue);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    if (canViewApprovals) {
-      loadApprovals();
-    }
-  }, [user, canViewApprovals]);
+  const { data: pendingApprovals = [] } = usePendingApprovalsQuery();
+  const approveResidentMutation = useApproveResidentMutation();
 
   const handleApprovePendingUser = async (id: string, approve: boolean) => {
     try {
-      await onboardingAPI.approve(id, approve);
+      await approveResidentMutation.mutateAsync({ userId: id, approve });
       toast.success(approve ? 'User approved!' : 'Application rejected.');
-      loadApprovals();
     } catch {
       toast.error('Verification decision failed.');
     }

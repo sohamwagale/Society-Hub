@@ -1,15 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Pin, Trash2, Paperclip } from 'lucide-react';
-import type { Announcement } from '../../types';
 import { announcementsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import CreateAnnouncementModal from './components/CreateAnnouncementModal';
 import { toast } from '../../components/Toast';
 import { confirmDialog } from '../../components/ConfirmModal';
+import {
+  useAnnouncementsQuery,
+  useCreateAnnouncementMutation,
+  useDeleteAnnouncementMutation,
+  useTogglePinAnnouncementMutation,
+} from '../../hooks/queries/useAnnouncements';
 
 export const AnnouncementsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const { data: announcements = [] } = useAnnouncementsQuery();
+  const createAnnouncementMutation = useCreateAnnouncementMutation();
+  const deleteAnnouncementMutation = useDeleteAnnouncementMutation();
+  const togglePinAnnouncementMutation = useTogglePinAnnouncementMutation();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -19,30 +28,17 @@ export const AnnouncementsTab: React.FC = () => {
   const [annPriority, setAnnPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
   const [annFile, setAnnFile] = useState<File | null>(null);
 
-  const loadAnnouncements = async () => {
-    try {
-      const list = await announcementsAPI.list();
-      setAnnouncements(list);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadAnnouncements();
-  }, []);
-
   const handleBlastAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await announcementsAPI.create(
-        {
+      await createAnnouncementMutation.mutateAsync({
+        ann: {
           title: annTitle,
           body: annBody,
           priority: annPriority,
         },
-        annFile || undefined
-      );
+        file: annFile || undefined,
+      });
 
       setIsSuccess(true);
       toast.success('Announcement broadcasted successfully!');
@@ -53,7 +49,6 @@ export const AnnouncementsTab: React.FC = () => {
         setAnnBody('');
         setAnnPriority('normal');
         setAnnFile(null);
-        loadAnnouncements();
       }, 1000);
     } catch {
       toast.error('Failed to broadcast notice.');
@@ -62,9 +57,8 @@ export const AnnouncementsTab: React.FC = () => {
 
   const handleTogglePinAnnouncement = async (id: string) => {
     try {
-      await announcementsAPI.togglePin(id);
+      await togglePinAnnouncementMutation.mutateAsync(id);
       toast.success('Pin status toggled!');
-      loadAnnouncements();
     } catch {
       toast.error('Failed to toggle pin.');
     }
@@ -77,9 +71,8 @@ export const AnnouncementsTab: React.FC = () => {
       confirmText: 'Delete Notice',
       onConfirm: async () => {
         try {
-          await announcementsAPI.delete(id);
+          await deleteAnnouncementMutation.mutateAsync(id);
           toast.success('Announcement deleted!');
-          loadAnnouncements();
         } catch {
           toast.error('Failed to delete announcement.');
         }

@@ -1,17 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, HelpCircle, X } from 'lucide-react';
-import type { Complaint, ComplaintComment, ComplaintCategory } from '../../types';
+import type { Complaint, ComplaintCategory } from '../../types';
 import { complaintsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import CreateComplaintModal from './components/CreateComplaintModal';
 import { toast } from '../../components/Toast';
+import {
+  useComplaintsQuery,
+  useComplaintCommentsQuery,
+  useCreateComplaintMutation,
+  useUpdateComplaintMutation,
+  useAddComplaintCommentMutation,
+} from '../../hooks/queries/useComplaints';
 
 export const ComplaintsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const { data: complaints = [] } = useComplaintsQuery();
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
-  const [comments, setComments] = useState<ComplaintComment[]>([]);
+  const { data: comments = [] } = useComplaintCommentsQuery(selectedComplaint ? selectedComplaint.id : null);
   const [commentInput, setCommentInput] = useState('');
+
+  const createComplaintMutation = useCreateComplaintMutation();
+  const updateComplaintMutation = useUpdateComplaintMutation();
+  const addCommentMutation = useAddComplaintCommentMutation();
 
   // Modal form state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,33 +32,10 @@ export const ComplaintsTab: React.FC = () => {
   const [complaintDesc, setComplaintDesc] = useState('');
   const [complaintFile, setComplaintFile] = useState<File | null>(null);
 
-  const loadComplaints = async () => {
-    try {
-      const list = await complaintsAPI.list();
-      setComplaints(list);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadComplaints();
-  }, []);
-
-  // Sync comments thread when active complaint opens
-  useEffect(() => {
-    if (selectedComplaint) {
-      complaintsAPI
-        .listComments(selectedComplaint.id)
-        .then(setComments)
-        .catch(console.error);
-    }
-  }, [selectedComplaint]);
-
   const handleRaiseComplaint = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const complaint = await complaintsAPI.create({
+      const complaint = await createComplaintMutation.mutateAsync({
         category: complaintCategory as ComplaintCategory,
         title: complaintTitle,
         description: complaintDesc,
@@ -65,7 +53,6 @@ export const ComplaintsTab: React.FC = () => {
         setComplaintTitle('');
         setComplaintDesc('');
         setComplaintFile(null);
-        loadComplaints();
       }, 1000);
     } catch {
       toast.error('Failed to register complaint.');
@@ -76,8 +63,10 @@ export const ComplaintsTab: React.FC = () => {
     e.preventDefault();
     if (!commentInput.trim() || !selectedComplaint) return;
     try {
-      const c = await complaintsAPI.addComment(selectedComplaint.id, commentInput);
-      setComments([...comments, c]);
+      await addCommentMutation.mutateAsync({
+        id: selectedComplaint.id,
+        message: commentInput,
+      });
       setCommentInput('');
       toast.success('Comment posted!');
     } catch {
@@ -88,12 +77,12 @@ export const ComplaintsTab: React.FC = () => {
   const handleUpdateComplaintStatus = async (status: 'in_progress' | 'resolved') => {
     if (!selectedComplaint) return;
     try {
-      const updated = await complaintsAPI.update(selectedComplaint.id, {
-        status,
+      const updated = await updateComplaintMutation.mutateAsync({
+        id: selectedComplaint.id,
+        updates: { status },
       });
       setSelectedComplaint(updated);
       toast.success(`Status updated to ${status.replace('_', ' ')}!`);
-      loadComplaints();
     } catch {
       toast.error('Failed to update ticket status.');
     }

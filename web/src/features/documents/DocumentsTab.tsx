@@ -1,15 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Upload, Download, Trash2 } from 'lucide-react';
-import type { SocietyDocument } from '../../types';
 import { documentsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import UploadDocumentModal from './components/UploadDocumentModal';
 import { toast } from '../../components/Toast';
 import { confirmDialog } from '../../components/ConfirmModal';
+import {
+  useDocumentsQuery,
+  useUploadDocumentMutation,
+  useApproveDocumentMutation,
+  useDeleteDocumentMutation,
+} from '../../hooks/queries/useDocuments';
 
 export const DocumentsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [documents, setDocuments] = useState<SocietyDocument[]>([]);
+  const { data: documents = [] } = useDocumentsQuery();
+  const uploadDocumentMutation = useUploadDocumentMutation();
+  const approveDocumentMutation = useApproveDocumentMutation();
+  const deleteDocumentMutation = useDeleteDocumentMutation();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -18,24 +27,15 @@ export const DocumentsTab: React.FC = () => {
   const [docDesc, setDocDesc] = useState('');
   const [docFile, setDocFile] = useState<File | null>(null);
 
-  const loadDocuments = async () => {
-    try {
-      const list = await documentsAPI.list();
-      setDocuments(list);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadDocuments();
-  }, []);
-
   const handleUploadDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!docFile) return;
     try {
-      await documentsAPI.upload(docTitle, docFile, docDesc);
+      await uploadDocumentMutation.mutateAsync({
+        title: docTitle,
+        file: docFile,
+        description: docDesc,
+      });
       setIsSuccess(true);
       toast.success('Document uploaded successfully!');
       setTimeout(() => {
@@ -44,7 +44,6 @@ export const DocumentsTab: React.FC = () => {
         setDocTitle('');
         setDocDesc('');
         setDocFile(null);
-        loadDocuments();
       }, 1000);
     } catch {
       toast.error('Failed to upload document.');
@@ -53,9 +52,8 @@ export const DocumentsTab: React.FC = () => {
 
   const handleApproveDocument = async (id: string) => {
     try {
-      await documentsAPI.approve(id);
+      await approveDocumentMutation.mutateAsync(id);
       toast.success('Document approved!');
-      loadDocuments();
     } catch {
       toast.error('Failed to approve document.');
     }
@@ -68,9 +66,8 @@ export const DocumentsTab: React.FC = () => {
       confirmText: 'Delete Document',
       onConfirm: async () => {
         try {
-          await documentsAPI.delete(id);
+          await deleteDocumentMutation.mutateAsync(id);
           toast.success('Document deleted!');
-          loadDocuments();
         } catch {
           toast.error('Failed to delete document.');
         }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Eye } from 'lucide-react';
 import type { ReimbursementRequest, ReimbursementCategory } from '../../types';
 import { reimbursementsAPI } from '../../services/api';
@@ -6,10 +6,20 @@ import { useAuthStore } from '../../store';
 import CreateReimbursementModal from './components/CreateReimbursementModal';
 import ReimbursementDetailsModal from './components/ReimbursementDetailsModal';
 import { toast } from '../../components/Toast';
+import {
+  useReimbursementsQuery,
+  useCreateReimbursementMutation,
+  useReviewReimbursementMutation,
+  useMarkReimbursementPaidMutation,
+} from '../../hooks/queries/useReimbursements';
 
 export const ReimbursementsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [reimbursements, setReimbursements] = useState<ReimbursementRequest[]>([]);
+  const { data: reimbursements = [] } = useReimbursementsQuery();
+  const createReimbursementMutation = useCreateReimbursementMutation();
+  const reviewReimbursementMutation = useReviewReimbursementMutation();
+  const markPaidMutation = useMarkReimbursementPaidMutation();
+
   const [selectedReimbursement, setSelectedReimbursement] = useState<ReimbursementRequest | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
@@ -24,19 +34,6 @@ export const ReimbursementsTab: React.FC = () => {
   const [reimbPaymentAddress, setReimbPaymentAddress] = useState('');
   const [reimbFile, setReimbFile] = useState<File | null>(null);
 
-  const loadReimbursements = async () => {
-    try {
-      const list = await reimbursementsAPI.list();
-      setReimbursements(list);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadReimbursements();
-  }, []);
-
   const handleRaiseReimbursement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (user?.role === 'admin') {
@@ -44,7 +41,7 @@ export const ReimbursementsTab: React.FC = () => {
       return;
     }
     try {
-      const req = await reimbursementsAPI.create({
+      const req = await createReimbursementMutation.mutateAsync({
         title: reimbTitle,
         description: reimbDesc,
         amount: reimbAmount,
@@ -68,7 +65,6 @@ export const ReimbursementsTab: React.FC = () => {
         setReimbDate('');
         setReimbPaymentAddress('');
         setReimbFile(null);
-        loadReimbursements();
       }, 1000);
     } catch {
       toast.error('Failed to submit reimbursement request.');
@@ -82,14 +78,16 @@ export const ReimbursementsTab: React.FC = () => {
     notes?: string
   ) => {
     try {
-      const updated = await reimbursementsAPI.review(reimbId, {
-        status,
-        approved_amount: status === 'approved' ? (approvedAmount || 0) : 0,
-        admin_notes: notes || undefined,
+      const updated = await reviewReimbursementMutation.mutateAsync({
+        id: reimbId,
+        updates: {
+          status,
+          approved_amount: status === 'approved' ? (approvedAmount || 0) : 0,
+          admin_notes: notes || undefined,
+        },
       });
       setSelectedReimbursement(updated);
       toast.success(`Claim ${status}!`);
-      loadReimbursements();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
       toast.error(err?.response?.data?.detail || 'Review submission failed.');
@@ -104,16 +102,18 @@ export const ReimbursementsTab: React.FC = () => {
     ref?: string
   ) => {
     try {
-      await reimbursementsAPI.markPaid(reimbId, {
-        amount,
-        payment_method: method,
-        transaction_ref: ref || undefined,
-        payment_date: new Date().toISOString().split('T')[0],
+      await markPaidMutation.mutateAsync({
+        id: reimbId,
+        payment: {
+          amount,
+          payment_method: method,
+          transaction_ref: ref || undefined,
+          payment_date: new Date().toISOString().split('T')[0],
+        },
       });
       setIsDetailsModalOpen(false);
       setSelectedReimbursement(null);
       toast.success('Payout marked paid & cleared!');
-      loadReimbursements();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
       toast.error(err?.response?.data?.detail || 'Failed to mark claim as cleared.');
@@ -123,13 +123,15 @@ export const ReimbursementsTab: React.FC = () => {
 
   const handleQuickReview = async (targetReq: ReimbursementRequest, status: 'approved' | 'rejected') => {
     try {
-      const updated = await reimbursementsAPI.review(targetReq.id, {
-        status,
-        approved_amount: status === 'approved' ? targetReq.amount : 0,
+      const updated = await reviewReimbursementMutation.mutateAsync({
+        id: targetReq.id,
+        updates: {
+          status,
+          approved_amount: status === 'approved' ? targetReq.amount : 0,
+        },
       });
       setSelectedReimbursement(updated);
       toast.success(`Claim ${status}!`);
-      loadReimbursements();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
       toast.error(err?.response?.data?.detail || 'Review submission failed.');

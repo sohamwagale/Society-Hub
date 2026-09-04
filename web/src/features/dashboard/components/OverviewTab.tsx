@@ -1,16 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Pin, Trash2, Paperclip } from 'lucide-react';
-import type { Announcement, EmergencyContact, Society, DashboardStats, SocietyInfoItem } from '../../../types';
-import { dashboardAPI, announcementsAPI, societyAPI } from '../../../services/api';
+import type { EmergencyContact, Society, SocietyInfoItem } from '../../../types';
+import { announcementsAPI, societyAPI } from '../../../services/api';
 import { useAuthStore } from '../../../store';
 import CreateAnnouncementModal from '../../announcements/components/CreateAnnouncementModal';
 import { toast } from '../../../components/Toast';
 import { confirmDialog } from '../../../components/ConfirmModal';
+import { useDashboardStatsQuery } from '../../../hooks/queries/useDashboard';
+import {
+  useAnnouncementsQuery,
+  useCreateAnnouncementMutation,
+  useTogglePinAnnouncementMutation,
+  useDeleteAnnouncementMutation,
+} from '../../../hooks/queries/useAnnouncements';
 
 export const OverviewTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const { data: dashboardStats } = useDashboardStatsQuery();
+  const { data: announcements = [] } = useAnnouncementsQuery();
+  const createAnnouncementMutation = useCreateAnnouncementMutation();
+  const togglePinAnnouncementMutation = useTogglePinAnnouncementMutation();
+  const deleteAnnouncementMutation = useDeleteAnnouncementMutation();
+
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
   const [societyInfo, setSocietyInfo] = useState<SocietyInfoItem[]>([]);
   const [currentSociety, setCurrentSociety] = useState<Society | null>(null);
@@ -24,30 +35,17 @@ export const OverviewTab: React.FC = () => {
   const [annPriority, setAnnPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
   const [annFile, setAnnFile] = useState<File | null>(null);
 
-  const loadData = async () => {
+  useEffect(() => {
     setLoadingInfo(true);
-    try {
-      const [stats, ann, contacts, info, soc] = await Promise.all([
-        dashboardAPI.stats(),
-        announcementsAPI.list(),
-        societyAPI.getEmergencyContacts(),
-        societyAPI.getInfo(),
-        societyAPI.listSocieties().then(list => list.find(s => s.id === user?.society_id) || null)
-      ]);
-      setDashboardStats(stats);
-      setAnnouncements(ann);
+    Promise.all([
+      societyAPI.getEmergencyContacts(),
+      societyAPI.getInfo(),
+      societyAPI.listSocieties().then(list => list.find(s => s.id === user?.society_id) || null)
+    ]).then(([contacts, info, soc]) => {
       setEmergencyContacts(contacts);
       setSocietyInfo(info);
       setCurrentSociety(soc);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingInfo(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
+    }).catch(console.error).finally(() => setLoadingInfo(false));
   }, [user]);
 
   const getInfoValue = (key: string, fallback?: string) => {
@@ -60,14 +58,14 @@ export const OverviewTab: React.FC = () => {
   const handleBlastAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await announcementsAPI.create(
-        {
+      await createAnnouncementMutation.mutateAsync({
+        ann: {
           title: annTitle,
           body: annBody,
           priority: annPriority,
         },
-        annFile || undefined
-      );
+        file: annFile || undefined,
+      });
 
       setIsSuccess(true);
       toast.success('Announcement broadcasted!');
@@ -78,7 +76,6 @@ export const OverviewTab: React.FC = () => {
         setAnnBody('');
         setAnnPriority('normal');
         setAnnFile(null);
-        loadData();
       }, 1000);
     } catch {
       toast.error('Broadcast failure.');
@@ -87,8 +84,7 @@ export const OverviewTab: React.FC = () => {
 
   const handleTogglePinAnnouncement = async (id: string) => {
     try {
-      await announcementsAPI.togglePin(id);
-      loadData();
+      await togglePinAnnouncementMutation.mutateAsync(id);
     } catch (e) {
       console.error(e);
     }
@@ -101,9 +97,8 @@ export const OverviewTab: React.FC = () => {
       confirmText: 'Delete Notice',
       onConfirm: async () => {
         try {
-          await announcementsAPI.delete(id);
+          await deleteAnnouncementMutation.mutateAsync(id);
           toast.success('Announcement deleted!');
-          loadData();
         } catch {
           toast.error('Failed to delete announcement.');
         }

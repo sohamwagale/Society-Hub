@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Paperclip } from 'lucide-react';
-import type { SocietyExpense } from '../../types';
 import { expensesAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import AddExpenseModal from './components/AddExpenseModal';
 import { toast } from '../../components/Toast';
+import { useExpensesQuery, useCreateExpenseMutation } from '../../hooks/queries/useExpenses';
 
 export const ExpensesTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [expenses, setExpenses] = useState<SocietyExpense[]>([]);
+  const { data: expenses = [] } = useExpensesQuery();
+  const createExpenseMutation = useCreateExpenseMutation();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -19,31 +21,18 @@ export const ExpensesTab: React.FC = () => {
   const [expenseDate, setExpenseDate] = useState('');
   const [expenseFile, setExpenseFile] = useState<File | null>(null);
 
-  const loadExpenses = async () => {
-    try {
-      const list = await expensesAPI.list();
-      setExpenses(list);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadExpenses();
-  }, []);
-
   const handleLogExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await expensesAPI.create(
-        {
+      await createExpenseMutation.mutateAsync({
+        expense: {
           title: expenseTitle,
           description: expenseDesc,
           amount: expenseAmount,
           expense_date: expenseDate,
         },
-        expenseFile || undefined
-      );
+        file: expenseFile || undefined,
+      });
 
       setIsSuccess(true);
       toast.success('Expenditure logged successfully!');
@@ -55,7 +44,6 @@ export const ExpensesTab: React.FC = () => {
         setExpenseAmount(0);
         setExpenseDate('');
         setExpenseFile(null);
-        loadExpenses();
       }, 1000);
     } catch {
       toast.error('Failed to record expense.');

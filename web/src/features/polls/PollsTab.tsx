@@ -1,15 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import type { Poll } from '../../types';
-import { pollsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import CreatePollModal from './components/CreatePollModal';
 import { toast } from '../../components/Toast';
 import { confirmDialog } from '../../components/ConfirmModal';
+import {
+  usePollsQuery,
+  useCreatePollMutation,
+  useVotePollMutation,
+  useClosePollMutation,
+  useDeletePollMutation,
+} from '../../hooks/queries/usePolls';
 
 export const PollsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [polls, setPolls] = useState<Poll[]>([]);
+  const { data: polls = [] } = usePollsQuery();
+  const createPollMutation = useCreatePollMutation();
+  const votePollMutation = useVotePollMutation();
+  const closePollMutation = useClosePollMutation();
+  const deletePollMutation = useDeletePollMutation();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -19,19 +29,6 @@ export const PollsTab: React.FC = () => {
   const [pollDeadline, setPollDeadline] = useState('');
   const [pollOptions, setPollOptions] = useState<string[]>(['Yes', 'No']);
 
-  const loadPolls = async () => {
-    try {
-      const list = await pollsAPI.list();
-      setPolls(list);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadPolls();
-  }, []);
-
   const handleCreatePoll = async (e: React.FormEvent) => {
     e.preventDefault();
     const validOptions = pollOptions.map((opt) => opt.trim()).filter((opt) => opt.length > 0);
@@ -40,7 +37,7 @@ export const PollsTab: React.FC = () => {
       return;
     }
     try {
-      await pollsAPI.create({
+      await createPollMutation.mutateAsync({
         title: pollTitle,
         description: pollDesc || undefined,
         deadline: pollDeadline,
@@ -55,7 +52,6 @@ export const PollsTab: React.FC = () => {
         setPollDesc('');
         setPollDeadline('');
         setPollOptions(['Yes', 'No']);
-        loadPolls();
       }, 1000);
     } catch {
       toast.error('Failed to create poll.');
@@ -64,9 +60,8 @@ export const PollsTab: React.FC = () => {
 
   const handleVote = async (pollId: string, optionId: string) => {
     try {
-      await pollsAPI.vote(pollId, optionId);
+      await votePollMutation.mutateAsync({ pollId, optionId });
       toast.success('Vote recorded!');
-      loadPolls();
     } catch {
       toast.error('Failed to register vote.');
     }
@@ -74,9 +69,8 @@ export const PollsTab: React.FC = () => {
 
   const handleClosePoll = async (id: string) => {
     try {
-      await pollsAPI.close(id);
+      await closePollMutation.mutateAsync(id);
       toast.success('Poll closed!');
-      loadPolls();
     } catch {
       toast.error('Failed to close poll.');
     }
@@ -89,9 +83,8 @@ export const PollsTab: React.FC = () => {
       confirmText: 'Delete Poll',
       onConfirm: async () => {
         try {
-          await pollsAPI.delete(id);
+          await deletePollMutation.mutateAsync(id);
           toast.success('Poll deleted!');
-          loadPolls();
         } catch {
           toast.error('Failed to delete poll.');
         }

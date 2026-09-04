@@ -1,37 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search, Check, X, PhoneCall, Mail } from 'lucide-react';
-import type { ResidentInfo } from '../../types';
-import { residentsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import { toast } from '../../components/Toast';
+import { useResidentsQuery, useSetCommitteeMutation } from '../../hooks/queries/useResidents';
 
 export const ResidentsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [residents, setResidents] = useState<ResidentInfo[]>([]);
+  const { data: residents = [] } = useResidentsQuery();
+  const setCommitteeMutation = useSetCommitteeMutation();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [committeeRoleInput, setCommitteeRoleInput] = useState('');
   const [activeResidentId, setActiveResidentId] = useState<string | null>(null);
 
-  const loadResidents = async () => {
-    try {
-      const res = await residentsAPI.list();
-      setResidents(res);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadResidents();
-  }, []);
-
   const handleSetCommittee = async (id: string, isCommittee: boolean) => {
     try {
-      await residentsAPI.setCommittee(id, isCommittee, isCommittee ? committeeRoleInput : undefined);
+      await setCommitteeMutation.mutateAsync({
+        userId: id,
+        isCommittee,
+        role: isCommittee ? committeeRoleInput : undefined,
+      });
       toast.success(isCommittee ? 'Committee member appointed!' : 'Committee status revoked.');
       setCommitteeRoleInput('');
       setActiveResidentId(null);
-      loadResidents();
     } catch {
       toast.error('Failed to update resident committee membership.');
     }

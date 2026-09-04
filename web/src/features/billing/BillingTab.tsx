@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Plus } from 'lucide-react';
-import type { Bill, BillCreate, BillPayment, BillResidentStatus } from '../../types';
+import type { Bill, BillCreate, BillPayment } from '../../types';
 import { billsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import CreateBillModal from './components/CreateBillModal';
@@ -10,6 +10,14 @@ import { BillCard } from './components/BillCard';
 import { FlatAuditPanel } from './components/FlatAuditPanel';
 import { toast } from '../../components/Toast';
 import { confirmDialog } from '../../components/ConfirmModal';
+import {
+  useBillsQuery,
+  usePaymentHistoryQuery,
+  useBillResidentStatusQuery,
+  useCreateBillMutation,
+  useDeleteBillMutation,
+  usePayBillMutation,
+} from '../../hooks/queries/useBills';
 
 interface RazorpayResponse {
   razorpay_order_id: string;
@@ -19,11 +27,14 @@ interface RazorpayResponse {
 
 export const BillingTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [bills, setBills] = useState<Bill[]>([]);
-  const [paymentHistory, setPaymentHistory] = useState<BillPayment[]>([]);
+  const { data: bills = [] } = useBillsQuery();
+  const { data: paymentHistory = [] } = usePaymentHistoryQuery();
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
-  const [complianceList, setComplianceList] = useState<BillResidentStatus[]>([]);
-  const [loadingCompliance, setLoadingCompliance] = useState(false);
+  const { data: complianceList = [], isLoading: loadingCompliance } = useBillResidentStatusQuery(selectedBillId);
+
+  const createBillMutation = useCreateBillMutation();
+  const deleteBillMutation = useDeleteBillMutation();
+  const payBillMutation = usePayBillMutation();
 
   // Modals & sub-state
   const [modalType, setModalType] = useState<string | null>(null);
@@ -51,46 +62,16 @@ export const BillingTab: React.FC = () => {
     }
   }, []);
 
-  const loadBillingData = async () => {
-    try {
-      const [list, history] = await Promise.all([
-        billsAPI.list(),
-        billsAPI.paymentHistory()
-      ]);
-      setBills(list);
-      setPaymentHistory(history);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadBillingData();
-  }, []);
-
-  // Sync compliance list when selected bill changes
-  useEffect(() => {
-    if (selectedBillId) {
-      setLoadingCompliance(true);
-      billsAPI
-        .getResidentStatus(selectedBillId)
-        .then(setComplianceList)
-        .catch(console.error)
-        .finally(() => setLoadingCompliance(false));
-    }
-  }, [selectedBillId]);
-
   const handleCreateBill = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await billsAPI.create(newBill);
+      await createBillMutation.mutateAsync(newBill);
       setIsCreateBillSuccess(true);
       toast.success('Billing cycle generated successfully!');
       setTimeout(() => {
         setIsCreateBillSuccess(false);
         setModalType(null);
         setNewBill({ title: '', description: '', amount: 0, due_date: '', bill_type: 'maintenance' });
-        loadBillingData();
       }, 1000);
     } catch {
       toast.error('Failed to generate bill cycle.');
@@ -104,10 +85,9 @@ export const BillingTab: React.FC = () => {
       confirmText: 'Delete Bill',
       onConfirm: async () => {
         try {
-          await billsAPI.delete(id);
+          await deleteBillMutation.mutateAsync(id);
           toast.success('Bill deleted!');
-          loadBillingData();
-        } catch{
+        } catch {
           toast.error('Failed to delete bill.');
         }
       },
@@ -134,7 +114,6 @@ export const BillingTab: React.FC = () => {
             setSuccessPaymentBill(bill);
             setSuccessPayment(payment);
             toast.success('Payment verified successfully!');
-            loadBillingData();
           } catch {
             toast.error('Signature verification failed.');
           }
@@ -159,7 +138,7 @@ export const BillingTab: React.FC = () => {
     e.preventDefault();
     if (!billReceiptFile || !uploadingReceiptBillId) return;
     try {
-      const receipt = await billsAPI.pay({
+      const receipt = await payBillMutation.mutateAsync({
         bill_id: uploadingReceiptBillId,
         amount: bills.find((b) => b.id === uploadingReceiptBillId)?.amount || 0,
         payment_method: 'Manual upload',
@@ -169,7 +148,6 @@ export const BillingTab: React.FC = () => {
       setModalType(null);
       setBillReceiptFile(null);
       setUploadingReceiptBillId(null);
-      loadBillingData();
     } catch {
       toast.error('Failed to upload receipt.');
     }

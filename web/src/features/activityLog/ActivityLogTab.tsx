@@ -1,34 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ShieldCheck, RefreshCw, Filter, ChevronLeft, ChevronRight, Activity, Download } from 'lucide-react';
-import type { ActivityLog } from '../../types';
 import { activityLogAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
+import { useActivityLogsQuery } from '../../hooks/queries/useActivityLogs';
 
 export const ActivityLogTab: React.FC = () => {
   const { user } = useAuthStore();
-  const [logs, setLogs] = useState<ActivityLog[]>([]);
-  const [loading, setLoading] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<string>('');
   const [page, setPage] = useState(0);
   const limit = 20;
 
-  const loadLogs = async () => {
-    setLoading(true);
-    try {
-      const data = await activityLogAPI.list(page * limit, limit, selectedEntity || undefined);
-      setLogs(data);
-    } catch (e) {
-      console.error('Failed to load activity logs:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: logs = [],
+    isLoading: loading,
+    isFetching,
+    refetch,
+  } = useActivityLogsQuery(page * limit, limit, selectedEntity || undefined);
 
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      loadLogs();
-    }
-  }, [user, page, selectedEntity]);
 
   if (user?.role !== 'admin') {
     return (
@@ -111,11 +99,11 @@ export const ActivityLogTab: React.FC = () => {
           </a>
 
           <button
-            onClick={loadLogs}
-            disabled={loading}
+            onClick={() => refetch()}
+            disabled={isFetching}
             className="flex items-center gap-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg transition-colors"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
             Refresh
           </button>
         </div>
