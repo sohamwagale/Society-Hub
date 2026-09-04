@@ -1,4 +1,4 @@
-import api, { tokenStorage } from './client';
+import api from './client';
 import type {
   TokenResponse,
   User,
@@ -13,7 +13,10 @@ export const authAPI = {
     const { data } = await api.post<TokenResponse>('/auth/login', formBody, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-    tokenStorage.set(data.access_token);
+    return data;
+  },
+  refresh: async (): Promise<TokenResponse> => {
+    const { data } = await api.post<TokenResponse>('/auth/refresh');
     return data;
   },
   register: async (req: RegisterRequest): Promise<User> => {
@@ -32,8 +35,12 @@ export const authAPI = {
     const { data } = await api.post<{ message: string }>('/auth/change-password', req);
     return data;
   },
-  logout: async () => {
-    tokenStorage.remove();
+  logout: async (): Promise<void> => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Ignore network errors on logout
+    }
   },
   registerPushToken: async (token: string): Promise<void> => {
     await api.post('/auth/push-token', { token });

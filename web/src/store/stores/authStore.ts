@@ -83,6 +83,6 @@ export const useAuthStore = create<AuthState>()(
 
 if (typeof window !== 'undefined') {
   window.addEventListener('unauthorized-logout', () => {
-    useAuthStore.getState().logout();
+    useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
   });
 }

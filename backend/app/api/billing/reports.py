@@ -1,42 +1,25 @@
-from typing import Optional
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from jose import jwt, JWTError
 
 from app.database import get_db
 from app.models.user import User
 from app.models.flat import Flat
 from app.models.society import Society
 from app.models.billing import Bill, BillPayment
-from app.core.config import SECRET_KEY, ALGORITHM
+from app.core.deps import get_current_user, require_role
 from app.services.export_service import generate_dues_csv, generate_payments_csv
 from app.services.pdf import generate_receipt_pdf, generate_bill_report_pdf
 
 router = APIRouter()
 
 
-def _authenticate_token_admin(token: Optional[str], db: Session) -> User:
-    if not token:
-        raise HTTPException(status_code=401, detail="Authentication token required (?token=)")
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    admin = db.query(User).filter(User.id == user_id).first()
-    if not admin or admin.role.value != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required")
-    return admin
-
-
 @router.get("/export-dues-csv")
-def export_unpaid_dues_csv(token: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    admin = _authenticate_token_admin(token, db)
+def export_unpaid_dues_csv(
+    admin: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
     active_bills = db.query(Bill).filter(Bill.society_id == admin.society_id).order_by(Bill.due_date.desc()).all()
     flats = db.query(Flat).filter(Flat.society_id == admin.society_id).order_by(Flat.block, Flat.flat_number).all()
 
@@ -49,8 +32,10 @@ def export_unpaid_dues_csv(token: Optional[str] = Query(None), db: Session = Dep
 
 
 @router.get("/payments/export-csv")
-def export_payment_receipts_csv(token: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    admin = _authenticate_token_admin(token, db)
+def export_payment_receipts_csv(
+    admin: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
     payments = (
         db.query(BillPayment)
         .join(Bill, BillPayment.bill_id == Bill.id)
@@ -67,8 +52,10 @@ def export_payment_receipts_csv(token: Optional[str] = Query(None), db: Session 
 
 
 @router.get("/export-report")
-def export_bills_report(token: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    admin = _authenticate_token_admin(token, db)
+def export_bills_report(
+    admin: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
     active_bills = db.query(Bill).filter(Bill.is_active == True, Bill.society_id == admin.society_id).order_by(Bill.due_date.desc()).all()
     flats = db.query(Flat).filter(Flat.society_id == admin.society_id).order_by(Flat.block, Flat.flat_number).all()
     society = db.query(Society).filter(Society.id == admin.society_id).first()
@@ -83,24 +70,18 @@ def export_bills_report(token: Optional[str] = Query(None), db: Session = Depend
 
 
 @router.get("/{payment_id}/receipt")
-def download_receipt(payment_id: str, token: Optional[str] = Query(None), db: Session = Depends(get_db)):
-    if not token:
-        raise HTTPException(status_code=401, detail="Authentication required. Provide ?token= query parameter.")
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    current_user = db.query(User).filter(User.id == user_id).first()
-    if not current_user:
-        raise HTTPException(status_code=401, detail="User not found")
-
-    payment = db.query(BillPayment).filter(BillPayment.id == payment_id, BillPayment.user_id == current_user.id).first()
+def download_receipt(
+    payment_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    payment = db.query(BillPayment).filter(BillPayment.id == payment_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment record not found")
+
+    # Allow if the user made the payment or is an admin of the same society
+    if payment.user_id != current_user.id and current_user.role.value != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to access this receipt")
 
     bill = db.query(Bill).filter(Bill.id == payment.bill_id).first()
     if not bill:

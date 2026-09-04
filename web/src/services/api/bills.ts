@@ -1,4 +1,4 @@
-import api, { BASE_URL, tokenStorage } from './client';
+import api, { BASE_URL } from './client';
 import type {
   Bill,
   BillCreate,
@@ -14,7 +14,7 @@ export const billsAPI = {
     const params: Record<string, string | boolean> = {};
     if (billType) params.bill_type = billType;
     if (activeOnly !== undefined) params.active_only = activeOnly;
-    const { data } = await api.get<Bill[]>('/bills', { params });
+    const { data } = await api.get<Bill[]>('/bills/', { params });
     return data;
   },
   get: async (id: string): Promise<Bill> => {
@@ -61,20 +61,16 @@ export const billsAPI = {
     return data;
   },
   getReceiptUrl: (paymentId: string): string => {
-    const token = tokenStorage.get();
-    return `${BASE_URL}/bills/${encodeURIComponent(paymentId)}/receipt?token=${encodeURIComponent(token || '')}`;
+    return `${BASE_URL}/bills/${encodeURIComponent(paymentId)}/receipt`;
   },
   getExportReportUrl: (): string => {
-    const token = tokenStorage.get();
-    return `${BASE_URL}/bills/export-report?token=${encodeURIComponent(token || '')}`;
+    return `${BASE_URL}/bills/export-report`;
   },
   getExportDuesCsvUrl: (): string => {
-    const token = tokenStorage.get();
-    return `${BASE_URL}/bills/export-dues-csv?token=${encodeURIComponent(token || '')}`;
+    return `${BASE_URL}/bills/export-dues-csv`;
   },
   getExportPaymentsCsvUrl: (): string => {
-    const token = tokenStorage.get();
-    return `${BASE_URL}/bills/payments/export-csv?token=${encodeURIComponent(token || '')}`;
+    return `${BASE_URL}/bills/payments/export-csv`;
   },
   createRazorpayOrder: async (billId: string): Promise<{
     razorpay_order_id: string; amount: number; amount_paise: number;

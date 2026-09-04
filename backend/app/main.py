@@ -24,10 +24,23 @@ from app.api import (
 
 app = FastAPI(title="Apartment Society Management API", version="2.0")
 
-# Configure Cross-Origin Resource Sharing (CORS) to allow requests from any origin
+# Configure Cross-Origin Resource Sharing (CORS) with credentials support
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+env_origins = os.getenv("CORS_ORIGINS")
+if env_origins:
+    allowed_origins.extend([origin.strip() for origin in env_origins.split(",") if origin.strip()])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

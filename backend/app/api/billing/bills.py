@@ -75,6 +75,7 @@ def list_bills(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    print(current_user)
     query = db.query(Bill).filter(Bill.society_id == current_user.society_id)
     if bill_type:
         query = query.filter(Bill.bill_type == BillType(bill_type))

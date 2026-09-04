@@ -1,21 +1,10 @@
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 
-let _token: string | null = null;
-
+// Deprecated storage shim for backwards compatibility
 export const tokenStorage = {
-  get: (): string | null => {
-    if (_token) return _token;
-    _token = localStorage.getItem('access_token');
-    return _token;
-  },
-  set: (token: string) => {
-    _token = token;
-    localStorage.setItem('access_token', token);
-  },
-  remove: () => {
-    _token = null;
-    localStorage.removeItem('access_token');
-  },
+  get: (): string | null => null,
+  set: (_token: string) => {},
+  remove: () => {},
 };
 
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -23,26 +12,80 @@ export const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
+  withCredentials: true,
   headers: { 'ngrok-skip-browser-warning': '1' },
 });
 
 export const publicApi = api;
 
-api.interceptors.request.use((config) => {
-  const token = tokenStorage.get();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+interface RetryQueueItem {
+  resolve: (value?: unknown) => void;
+  reject: (reason?: unknown) => void;
+  config: InternalAxiosRequestConfig;
+}
+
+let isRefreshing = false;
+let failedQueue: RetryQueueItem[] = [];
+
+const processQueue = (error: unknown = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(api(prom.config));
+    }
+  });
+  failedQueue = [];
+};
 
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      tokenStorage.remove();
-      window.dispatchEvent(new Event('unauthorized-logout'));
+    const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+
+    if (!originalRequest) {
+      return Promise.reject(error);
     }
+
+    // Skip auto-refresh for auth endpoints themselves, and for /auth/me
+    // (me is used as a session probe at startup — a 401 there simply means
+    // the user is not logged in, not that the access token expired mid-session)
+    const isAuthEndpoint =
+      originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/refresh') ||
+      originalRequest.url?.includes('/auth/logout') ||
+      originalRequest.url?.includes('/auth/me');
+
+    if (error.response?.status === 401 && !isAuthEndpoint && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject, config: originalRequest });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        await axios.post(
+          `${BASE_URL}/auth/refresh`,
+          {},
+          {
+            withCredentials: true,
+            headers: { 'ngrok-skip-browser-warning': '1' },
+          }
+        );
+        processQueue(null);
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError);
+        window.dispatchEvent(new Event('unauthorized-logout'));
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
     return Promise.reject(error);
   }
 );
