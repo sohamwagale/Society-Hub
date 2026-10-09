@@ -28,6 +28,8 @@ export const documentsAPI = {
     await api.delete(`/documents/${encodeURIComponent(id)}`);
   },
   getFileUrl: (path: string): string => {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return BASE_URL.replace('/api', '') + path;
   },
 };

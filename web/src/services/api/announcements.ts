@@ -32,6 +32,8 @@ export const announcementsAPI = {
     return data;
   },
   getAttachmentUrl: (path: string): string => {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return BASE_URL.replace('/api', '') + path;
   },
 };
