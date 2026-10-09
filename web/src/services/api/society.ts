@@ -36,7 +36,7 @@ export const societyAPI = {
     return data;
   },
   create: async (society: { name: string; address?: string }): Promise<Society> => {
-    const { data } = await api.post<Society>('/society', society);
+    const { data } = await api.post<Society>('/society/', society);
     return data;
   },
 };

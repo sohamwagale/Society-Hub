@@ -34,7 +34,7 @@ export const billsAPI = {
     return data;
   },
   create: async (bill: BillCreate): Promise<Bill> => {
-    const { data } = await api.post<Bill>('/bills', bill);
+    const { data } = await api.post<Bill>('/bills/', bill);
     return data;
   },
   pay: async (payment: PayBillRequest): Promise<BillPayment> => {

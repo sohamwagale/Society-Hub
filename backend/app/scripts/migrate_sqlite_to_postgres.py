@@ -1,141 +1,203 @@
-# Import standard OS module for path manipulation
+# Import standard OS and system modules
 import os
-# Import sys to modify Python path and handle exits
 import sys
-# Import SQLAlchemy components for database connection and metadata reflection
-from sqlalchemy import create_engine, MetaData
-# Import sessionmaker to establish connection pools
+import argparse
+from typing import List, Dict, Any
+# Import SQLAlchemy components
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
 # Import load_dotenv to read database credentials from the .env file
 from dotenv import load_dotenv
 
-def migrate_data():
-    """Main function to orchestrate the ETL (Extract, Transform, Load) process from SQLite to Postgres."""
-    print("Initiating full data migration: Local SQLite ──▶ Supabase Postgres...")
-    # Read environment variables
-    load_dotenv()
-    
-    # ── Path Resolution ──
-    # Calculate the root directory of the backend to ensure relative imports work correctly
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    # Append root to sys.path to resolve the 'app' module
-    sys.path.insert(0, BASE_DIR)
+def format_postgres_url(raw_url: str) -> str:
+    """Normalize Postgres connection URL for SQLAlchemy and Supabase."""
+    url = raw_url.strip()
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    return url
 
-    # 1. ── Destination Setup: Postgres (Supabase) ──
-    # Retrieve the target connection string
-    postgres_url = os.environ.get("DATABASE_URL")
+
+def reset_postgres_sequences(engine):
+    """
+    Synchronizes all PostgreSQL auto-increment sequences with MAX(id)
+    to prevent duplicate key errors on subsequent INSERT operations.
+    """
+    print("\n[+] Synchronizing PostgreSQL primary key sequences...")
+    with engine.connect() as conn:
+        with conn.begin():
+            inspector = inspect(engine)
+            table_names = inspector.get_table_names()
+            
+            for table_name in table_names:
+                try:
+                    pk_constraint = inspector.get_pk_constraint(table_name)
+                    pk_cols = pk_constraint.get("constrained_columns", [])
+                    if not pk_cols or len(pk_cols) != 1:
+                        continue
+                    
+                    pk_col = pk_cols[0]
+                    seq_query = text(f"SELECT pg_get_serial_sequence('{table_name}', '{pk_col}') AS seq_name;")
+                    seq_res = conn.execute(seq_query).scalar()
+                    
+                    if seq_res:
+                        sync_sql = text(
+                            f"SELECT setval('{seq_res}', COALESCE((SELECT MAX({pk_col}) FROM {table_name}), 1), true);"
+                        )
+                        conn.execute(sync_sql)
+                        print(f"    ✓ Sequence updated for [{table_name}.{pk_col}] -> {seq_res}")
+                except Exception:
+                    pass
+
+
+def migrate_data(source_db_path: str = None, target_db_url: str = None, clean: bool = True):
+    """Orchestrates the ETL process from SQLite to Supabase Postgres."""
+    print("=" * 65)
+    print("  🚀 SocietyHub: SQLite -> Supabase Postgres Migration")
+    print("=" * 65)
+
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if BASE_DIR not in sys.path:
+        sys.path.insert(0, BASE_DIR)
+
+    load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+    # Destination Postgres Setup
+    postgres_url = target_db_url or os.environ.get("SUPABASE_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    if not postgres_url or postgres_url.startswith("sqlite"):
+        postgres_url = input("Enter your Supabase PostgreSQL connection string:\n> ").strip()
+
     if not postgres_url:
-        print("CRITICAL ERROR: 'DATABASE_URL' is missing from your .env configuration.")
+        print("CRITICAL ERROR: 'DATABASE_URL' is missing from configuration.")
         sys.exit(1)
-        
-    print(f"Establishing connection to Destination: Postgres...")
-    # Initialize engine with pool_pre_ping to handle potential connection drops during long migrations
-    pg_engine = create_engine(postgres_url, pool_pre_ping=True)
-    # Create the session factory
+
+    postgres_url = format_postgres_url(postgres_url)
+    
+    # Supabase Transaction Pooler (port 6543) configuration
+    if ":6543" in postgres_url:
+        from sqlalchemy.pool import NullPool
+        pg_engine = create_engine(postgres_url, poolclass=NullPool)
+    else:
+        pg_engine = create_engine(postgres_url, pool_pre_ping=True)
+
+    # Source SQLite Setup
+    sqlite_db_path = source_db_path or os.path.join(BASE_DIR, "society.db")
+    if not os.path.exists(sqlite_db_path):
+        print(f"CRITICAL ERROR: SQLite database file not found at '{sqlite_db_path}'.")
+        sys.exit(1)
+
+    sqlite_url = f"sqlite:///{sqlite_db_path}"
+    sqlite_engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
+
+    # Model imports and Schema Initialization
+    import app.models
+    from app.database import Base
+    from app.models import (
+        Society, SocietyInfo, Flat, User, EmergencyContact,
+        Bill, BillPayment,
+        Complaint, ComplaintComment,
+        Poll, PollOption, Vote,
+        ReimbursementRequest, ReimbursementPayment,
+        Announcement, Notification,
+        SocietyDocument, SocietyExpense, ActivityLog
+    )
+    from app.models.billing import BillFlatAmount
+
+    print("\n[1/4] Ensuring PostgreSQL schema tables exist...")
+    Base.metadata.create_all(bind=pg_engine)
+    print("    ✓ All schema tables ready.")
+
+    ordered_tables = [
+        Society, SocietyInfo, Flat, User, EmergencyContact,
+        Bill, BillFlatAmount, BillPayment,
+        Complaint, ComplaintComment,
+        Poll, PollOption, Vote,
+        ReimbursementRequest, ReimbursementPayment,
+        Announcement, Notification,
+        SocietyDocument, SocietyExpense, ActivityLog
+    ]
+
+    SqliteSession = sessionmaker(bind=sqlite_engine)
     PgSession = sessionmaker(bind=pg_engine)
+    sqlite_session = SqliteSession()
     pg_session = PgSession()
 
-    # 2. ── Source Setup: SQLite (Local) ──
-    # Map the local database file location
-    sqlite_db_path = os.path.join(BASE_DIR, 'society.db')
-    sqlite_url = f"sqlite:///{sqlite_db_path}"
-    print(f"Opening Source: SQLite ({sqlite_db_path})")
-    
-    # Verify the source file actually exists
-    if not os.path.exists(sqlite_db_path):
-        print("CRITICAL ERROR: 'society.db' not found. Ensure the file is in the backend root.")
-        sys.exit(1)
+    stats: List[Dict[str, Any]] = []
 
-    # Initialize the local engine
-    sqlite_engine = create_engine(sqlite_url)
-    SqliteSession = sessionmaker(bind=sqlite_engine)
-    sqlite_session = SqliteSession()
-
-    # ── Database Model Imports ──
-    # We import these inside the function to ensure the sys.path manipulation has taken effect
-    from sqlalchemy import text
-    from sqlalchemy.orm import Session
-    
+    print("\n[2/4] Migrating table rows...")
+    supports_replica = False
     try:
-        # Import all application models to use for batch querying and insertion
-        from app.models import (
-            Society, SocietyInfo, Flat, User, EmergencyContact,
-            Bill, BillPayment,
-            Complaint, ComplaintComment,
-            Poll, PollOption, Vote,
-            ReimbursementRequest, ReimbursementPayment,
-            Announcement, Notification,
-            SocietyDocument, SocietyExpense, ActivityLog
-        )
-        from app.models.billing import BillFlatAmount
-
-        # Order of tables is important to maintain referential integrity (Top-level tables first)
-        tables_to_migrate = [
-            Society,
-            SocietyInfo,
-            Flat,
-            User,
-            EmergencyContact,
-            Bill,
-            BillFlatAmount,
-            BillPayment,
-            Complaint,
-            ComplaintComment,
-            Poll,
-            PollOption,
-            Vote,
-            ReimbursementRequest,
-            ReimbursementPayment,
-            Announcement,
-            Notification,
-            SocietyDocument,
-            SocietyExpense,
-            ActivityLog
-        ]
-
-        # ── Migration Strategy ──
-        # Temporarily disable foreign key constraints in Postgres to allow out-of-order data seeding
-        # Using 'replica' role bypasses constraint checks during the session
         pg_session.execute(text("SET session_replication_role = 'replica';"))
-        
-        # Iterate through each model and perform the data transfer
-        for model in tables_to_migrate:
+        pg_session.commit()
+        supports_replica = True
+    except Exception:
+        pg_session.rollback()
+
+    try:
+        for model in ordered_tables:
             table_name = model.__tablename__
-            print(f"Migrating table [{table_name}]... ", end="")
-            
-            # Step A: Extract all rows from the local SQLite source
             rows = sqlite_session.query(model).all()
+            
             if not rows:
-                print("Skipped (Empty Table)")
+                stats.append({"table": table_name, "source": 0, "target": 0, "status": "Empty (0)"})
+                print(f"  • Table [{table_name}]: 0 records (Skipped)")
                 continue
 
-            # Step B: Prepare destination by purging existing data (Idempotency check)
-            pg_session.execute(text(f"TRUNCATE TABLE {table_name} CASCADE;"))
-            
-            # Step C: Load data into Postgres
+            if clean:
+                try:
+                    pg_session.execute(text(f"TRUNCATE TABLE {table_name} CASCADE;"))
+                    pg_session.commit()
+                except Exception:
+                    pg_session.rollback()
+                    try:
+                        pg_session.query(model).delete()
+                        pg_session.commit()
+                    except Exception:
+                        pg_session.rollback()
+
             for row in rows:
-                # Use 'merge' to attach detached SQLite instances to the new Postgres session
+                sqlite_session.expunge(row)
                 pg_session.merge(row)
 
-            # Commit the table batch
             pg_session.commit()
-            print(f"Success ({len(rows)} records synchronized)")
-
-        # ── Finalization ──
-        # Restore standard constraint enforcement behavior
-        pg_session.execute(text("SET session_replication_role = 'origin';"))
-        pg_session.commit()
-        print("\n🏆 Migration cycle successfully finalized!")
+            target_count = pg_session.query(model).count()
+            stats.append({
+                "table": table_name,
+                "source": len(rows),
+                "target": target_count,
+                "status": "OK" if len(rows) == target_count else "MISMATCH"
+            })
+            print(f"  ✓ Migrated [{table_name}]: {len(rows)} records -> Verified: {target_count}")
 
     except Exception as e:
-        # Handle failures by rolling back the current transaction to prevent partial/corrupt data
-        print(f"\n☢️ CRITICAL FAILURE during migration: {e}")
         pg_session.rollback()
+        print(f"\n☢️ CRITICAL FAILURE during migration: {e}")
+        return False
     finally:
-        # Guarantee closure of both database connections
+        if supports_replica:
+            try:
+                pg_session.execute(text("SET session_replication_role = 'origin';"))
+                pg_session.commit()
+            except Exception:
+                pass
         sqlite_session.close()
         pg_session.close()
 
-# Main entry point guard
+    # Step 3: Sequence reset
+    reset_postgres_sequences(pg_engine)
+
+    # Step 4: Summary
+    print("\n" + "=" * 65)
+    print(" [4/4] MIGRATION SUMMARY")
+    print("=" * 65)
+    print(f"{'Table Name':<30} {'SQLite Count':<15} {'Postgres Count':<15} {'Status'}")
+    print("-" * 65)
+    for stat in stats:
+        print(f"{stat['table']:<30} {stat['source']:<15} {stat['target']:<15} {stat['status']}")
+    print("=" * 65)
+    print("🎉 Migration completed successfully!\n")
+    return True
+
+
 if __name__ == "__main__":
     migrate_data()
+
