@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Pin, Trash2, Paperclip, PhoneCall, CreditCard, PenTool, Vote, TrendingUp, AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Plus, Pin, Trash2, Paperclip, PhoneCall, CreditCard, PenTool, Vote, TrendingUp, CheckCircle2, ChevronRight } from 'lucide-react';
 import type { EmergencyContact, Society, SocietyInfoItem } from '../../../types';
 import { announcementsAPI, societyAPI } from '../../../services/api';
 import { useAuthStore } from '../../../store';

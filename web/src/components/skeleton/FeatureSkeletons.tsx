@@ -140,7 +140,7 @@ export const ResidentsSkeleton: React.FC = () => {
         <table className="w-full min-w-[650px] text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/50">
-              {['Resident', 'Flat Mapping', 'Board Role', 'Email Address', 'One-Tap Call', 'Actions'].map((h, i) => (
+              {['Resident', 'Flat Mapping', 'Board Role', 'Email Address', 'One-Tap Call', 'Actions'].map((_, i) => (
                 <th key={i} className="p-3.5">
                   <Skeleton variant="text" width={70} height={12} />
                 </th>
@@ -359,7 +359,7 @@ export const ExpensesSkeleton: React.FC = () => {
         <table className="w-full min-w-[500px] text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/50">
-              {['Expense Title', 'Spent On', 'Amount', 'Invoice File'].map((h, i) => (
+              {['Expense Title', 'Spent On', 'Amount', 'Invoice File'].map((_, i) => (
                 <th key={i} className="p-3.5">
                   <Skeleton variant="text" width={80} height={12} />
                 </th>
@@ -620,7 +620,7 @@ export const ActivityLogSkeleton: React.FC = () => {
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="border-b border-slate-200 text-slate-500 bg-slate-50/50">
-              {['Timestamp', 'User', 'Action', 'Entity', 'Details'].map((h, i) => (
+              {['Timestamp', 'User', 'Action', 'Entity', 'Details'].map((_, i) => (
                 <th key={i} className="py-3 px-4">
                   <Skeleton variant="text" width={70} height={12} />
                 </th>
