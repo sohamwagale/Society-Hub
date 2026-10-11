@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 @theme {
-  --radius-3xl: 10px;
-  --radius-2xl: 8px;
-  --radius-xl: 6px;
-  --radius-lg: 4px;
-  --radius-md: 4px;
-  --radius-sm: 2px;
-  --radius: 4px;
+  --radius-3xl: 1.5rem;
+  --radius-2xl: 1rem;
+  --radius-xl: 0.75rem;
+  --radius-lg: 0.5rem;
+  --radius-md: 0.375rem;
+  --radius-sm: 0.25rem;
+  --radius: 0.5rem;
 }
 
 :root {
@@ -18,7 +18,7 @@ body {
   margin: 0;
   display: flex;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100dvh;
   color: #0f172a;
   background-color: #f8fafc;
 }
@@ -27,7 +27,6 @@ body {
   width: 100%;
 }
 
-/* Force dark readable text on all input, select, textarea, and option elements */
 input,
 select,
 textarea,
@@ -36,20 +35,92 @@ option {
   background-color: #ffffff;
 }
 
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+@media (min-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: inherit;
+  }
+}
+
 input::placeholder,
 textarea::placeholder {
   color: #94a3b8 !important;
   opacity: 1;
 }
 
-/* Global scrollbar hiding while maintaining full scrolling functionality */
-::-webkit-scrollbar {
-  display: none;
-  width: 0px;
-  height: 0px;
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }
 
-* {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(15 23 42 / 0.6);
+  backdrop-filter: blur(4px);
+  padding: 0;
+}
+
+@media (min-width: 768px) {
+  .modal-overlay {
+    align-items: center;
+    padding: 1rem;
+  }
+}
+
+.modal-panel {
+  width: 100%;
+  max-height: 92dvh;
+  overflow-y: auto;
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  .modal-panel {
+    border-radius: 1rem;
+    padding-bottom: 1.5rem;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.75) 0%,
+    rgba(241, 245, 249, 0.95) 50%,
+    rgba(226, 232, 240, 0.75) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
 }

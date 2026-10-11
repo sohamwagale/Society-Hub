@@ -23,13 +23,14 @@ def list_flats(
 def create_flat(
     data: FlatCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    admin: User = Depends(require_role("admin")),
 ):
     flat = Flat(
         id=str(uuid.uuid4()),
         flat_number=data.flat_number,
         block=data.block,
         floor=data.floor,
+        society_id=admin.society_id,
     )
     db.add(flat)
     db.commit()

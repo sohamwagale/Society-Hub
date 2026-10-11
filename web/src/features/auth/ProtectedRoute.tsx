@@ -2,6 +2,8 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store';
 
+import { DashboardSkeleton } from '../../components/skeleton';
+
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
@@ -12,14 +14,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
   const location = useLocation();
 
   if (isLoading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
-          <p className="text-slate-500 font-medium text-sm">Loading your session...</p>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!isAuthenticated || !user) {
@@ -36,7 +31,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
 
   if (requireAdmin && user.role !== 'admin') {
     // If route requires admin and user is not admin, redirect to root
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

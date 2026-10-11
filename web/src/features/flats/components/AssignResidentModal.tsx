@@ -30,8 +30,8 @@ export const AssignResidentModal: React.FC<AssignResidentModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-md flex flex-col h-[400px]">
+    <div className="modal-overlay">
+      <div className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md flex flex-col h-[400px]">
         <div className="flex justify-between items-center pb-2 border-b border-slate-100 mb-4">
           <h3 className="font-bold text-slate-800 text-lg">Locate Occupant for {selectedFlat.flat_number}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">

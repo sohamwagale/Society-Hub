@@ -37,16 +37,16 @@ export const LandingPage: React.FC = () => {
     : 'Open Resident Dashboard';
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-violet-600 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-600 selection:text-white">
       
       {/* ── 1. Header Navigation ── */}
-      <header className="bg-white/90 border-b border-violet-100 sticky top-0 z-50 backdrop-blur-md">
+      <header className="bg-white/90 border-b border-indigo-100 sticky top-0 z-50 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             
             {/* Brand Logo */}
             <Link to="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-sm bg-violet-600 flex items-center justify-center text-white shadow-sm">
+              <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm">
                 <Building2 className="w-4 h-4" />
               </div>
               <span className="text-lg font-bold text-slate-900 tracking-tight">
@@ -63,7 +63,7 @@ export const LandingPage: React.FC = () => {
                   </span>
                   <button
                     onClick={() => navigate(primaryTarget)}
-                    className="px-4 py-2 rounded-sm bg-violet-600 hover:bg-violet-700 text-white font-medium text-sm transition-colors cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors cursor-pointer"
                   >
                     {needsOnboarding ? 'Complete Onboarding' : 'Go to Dashboard'}
                   </button>
@@ -72,13 +72,13 @@ export const LandingPage: React.FC = () => {
                 <>
                   <Link
                     to="/login"
-                    className="px-3.5 py-2 text-sm font-medium text-slate-700 hover:text-violet-700 transition-colors"
+                    className="px-3.5 py-2 text-sm font-medium text-slate-700 hover:text-indigo-700 transition-colors"
                   >
                     Sign In
                   </Link>
                   <Link
                     to="/register"
-                    className="px-4 py-2 rounded-sm bg-violet-600 hover:bg-violet-700 text-white font-medium text-sm transition-colors"
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-colors"
                   >
                     Get Started
                   </Link>
@@ -101,12 +101,12 @@ export const LandingPage: React.FC = () => {
 
         {/* Mobile Dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-b border-violet-100 bg-white px-4 pt-2 pb-4 space-y-2">
+          <div className="md:hidden border-b border-indigo-100 bg-white px-4 pt-2 pb-4 space-y-2">
             <div className="pt-2 flex flex-col gap-2">
               {isAuthenticated && user ? (
                 <button
                   onClick={() => navigate(primaryTarget)}
-                  className="w-full py-2 rounded-sm bg-violet-600 text-white font-medium text-sm cursor-pointer"
+                  className="w-full py-2 rounded-xl bg-indigo-600 text-white font-medium text-sm cursor-pointer"
                 >
                   {needsOnboarding ? 'Complete Onboarding' : 'Go to Dashboard'}
                 </button>
@@ -114,13 +114,13 @@ export const LandingPage: React.FC = () => {
                 <>
                   <Link
                     to="/login"
-                    className="w-full py-2 text-center text-sm font-medium text-slate-700 bg-violet-50 rounded-sm border border-violet-200"
+                    className="w-full py-2 text-center text-sm font-medium text-slate-700 bg-indigo-50 rounded-xl border border-indigo-200"
                   >
                     Sign In
                   </Link>
                   <Link
                     to="/register"
-                    className="w-full py-2 text-center text-sm font-medium text-white bg-violet-600 rounded-sm"
+                    className="w-full py-2 text-center text-sm font-medium text-white bg-indigo-600 rounded-xl"
                   >
                     Get Started
                   </Link>
@@ -132,7 +132,7 @@ export const LandingPage: React.FC = () => {
       </header>
 
       {/* ── 2. Hero Section ── */}
-      <section className="py-20 md:py-28 border-b border-violet-100 bg-gradient-to-b from-violet-50/70 via-violet-50/20 to-white">
+      <section className="py-20 md:py-28 border-b border-indigo-100 bg-gradient-to-b from-indigo-50/70 via-indigo-50/20 to-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
 
           <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-slate-900 leading-tight">
@@ -146,7 +146,7 @@ export const LandingPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <Link
               to={primaryTarget}
-              className="w-full sm:w-auto px-6 py-3 rounded-sm bg-violet-600 hover:bg-violet-700 text-white font-medium text-sm text-center transition-colors shadow-sm"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm text-center transition-colors shadow-sm"
             >
               {primaryLabel}
             </Link>
@@ -154,14 +154,14 @@ export const LandingPage: React.FC = () => {
             {isAuthenticated && user ? (
               <button
                 onClick={() => logout()}
-                className="w-full sm:w-auto px-6 py-3 rounded-sm bg-white hover:bg-violet-50 border border-violet-200 text-slate-800 font-medium text-sm text-center transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-white hover:bg-indigo-50 border border-indigo-200 text-slate-800 font-medium text-sm text-center transition-colors cursor-pointer"
               >
                 Sign Out ({user.name})
               </button>
             ) : (
               <Link
                 to="/login"
-                className="w-full sm:w-auto px-6 py-3 rounded-sm bg-white hover:bg-violet-50 border border-violet-200 text-slate-800 font-medium text-sm text-center transition-colors"
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-white hover:bg-indigo-50 border border-indigo-200 text-slate-800 font-medium text-sm text-center transition-colors"
               >
                 Sign In to Portal
               </Link>
@@ -169,16 +169,16 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Technical Specifications Bar */}
-          <div className="pt-10 border-t border-violet-100 max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs font-mono text-slate-600 text-left sm:text-center">
-            <div className="p-3 bg-white border border-violet-100 rounded-sm">
+          <div className="pt-10 border-t border-indigo-100 max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs font-mono text-slate-600 text-left sm:text-center">
+            <div className="p-3 bg-white border border-indigo-100 rounded-xl">
               <span className="text-slate-900 font-bold block">Razorpay API Integration</span>
               <span className="text-slate-500">Automated Payment Webhooks</span>
             </div>
-            <div className="p-3 bg-white border border-violet-100 rounded-sm">
+            <div className="p-3 bg-white border border-indigo-100 rounded-xl">
               <span className="text-slate-900 font-bold block">RBAC Security Model</span>
               <span className="text-slate-500">Admin & Resident Roles</span>
             </div>
-            <div className="p-3 bg-white border border-violet-100 rounded-sm">
+            <div className="p-3 bg-white border border-indigo-100 rounded-xl">
               <span className="text-slate-900 font-bold block">SLA Maintenance Helpdesk</span>
               <span className="text-slate-500">Real-time Ticket Tracking</span>
             </div>
@@ -188,11 +188,11 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* ── 3. Core System Capabilities Grid ── */}
-      <section className="py-16 md:py-24 border-b border-violet-100 bg-violet-50/30">
+      <section className="py-16 md:py-24 border-b border-indigo-100 bg-indigo-50/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           <div className="max-w-3xl mb-12">
-            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-violet-600 mb-2">Capabilities Overview</h2>
+            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-600 mb-2">Capabilities Overview</h2>
             <p className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">
               Structured Operations for Housing Management
             </p>
@@ -201,8 +201,8 @@ export const LandingPage: React.FC = () => {
           {/* 4-Column Layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
-            <div className="p-6 rounded-sm bg-white border border-violet-100 space-y-3 shadow-sm">
-              <div className="w-9 h-9 rounded-sm bg-violet-100/80 border border-violet-200 flex items-center justify-center text-violet-700">
+            <div className="p-6 rounded-xl bg-white border border-indigo-100 space-y-3 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-indigo-100/80 border border-indigo-200 flex items-center justify-center text-indigo-700">
                 <CreditCard className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-slate-900">Automated Billing</h3>
@@ -211,8 +211,8 @@ export const LandingPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="p-6 rounded-sm bg-white border border-violet-100 space-y-3 shadow-sm">
-              <div className="w-9 h-9 rounded-sm bg-violet-100/80 border border-violet-200 flex items-center justify-center text-violet-700">
+            <div className="p-6 rounded-xl bg-white border border-indigo-100 space-y-3 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-indigo-100/80 border border-indigo-200 flex items-center justify-center text-indigo-700">
                 <Wrench className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-slate-900">Grievance Helpdesk</h3>
@@ -221,8 +221,8 @@ export const LandingPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="p-6 rounded-sm bg-white border border-violet-100 space-y-3 shadow-sm">
-              <div className="w-9 h-9 rounded-sm bg-violet-100/80 border border-violet-200 flex items-center justify-center text-violet-700">
+            <div className="p-6 rounded-xl bg-white border border-indigo-100 space-y-3 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-indigo-100/80 border border-indigo-200 flex items-center justify-center text-indigo-700">
                 <PieChart className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-slate-900">Financial Ledgers</h3>
@@ -231,8 +231,8 @@ export const LandingPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="p-6 rounded-sm bg-white border border-violet-100 space-y-3 shadow-sm">
-              <div className="w-9 h-9 rounded-sm bg-violet-100/80 border border-violet-200 flex items-center justify-center text-violet-700">
+            <div className="p-6 rounded-xl bg-white border border-indigo-100 space-y-3 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-indigo-100/80 border border-indigo-200 flex items-center justify-center text-indigo-700">
                 <Bell className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-slate-900">Notice Broadcasts</h3>
@@ -246,8 +246,8 @@ export const LandingPage: React.FC = () => {
           {/* Secondary 2-Column Technical Feature Block */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             
-            <div className="p-6 rounded-sm bg-white border border-violet-100 flex items-start gap-4 shadow-sm">
-              <div className="w-9 h-9 rounded-sm bg-violet-100/80 border border-violet-200 flex items-center justify-center text-violet-700 shrink-0 mt-1">
+            <div className="p-6 rounded-xl bg-white border border-indigo-100 flex items-start gap-4 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-indigo-100/80 border border-indigo-200 flex items-center justify-center text-indigo-700 shrink-0 mt-1">
                 <Vote className="w-5 h-5" />
               </div>
               <div>
@@ -258,8 +258,8 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 rounded-sm bg-white border border-violet-100 flex items-start gap-4 shadow-sm">
-              <div className="w-9 h-9 rounded-sm bg-violet-100/80 border border-violet-200 flex items-center justify-center text-violet-700 shrink-0 mt-1">
+            <div className="p-6 rounded-xl bg-white border border-indigo-100 flex items-start gap-4 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-indigo-100/80 border border-indigo-200 flex items-center justify-center text-indigo-700 shrink-0 mt-1">
                 <FileText className="w-5 h-5" />
               </div>
               <div>
@@ -276,11 +276,11 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* ── 4. Solutions Persona Matrix ── */}
-      <section className="py-16 md:py-24 border-b border-violet-100 bg-white">
+      <section className="py-16 md:py-24 border-b border-indigo-100 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           <div className="max-w-3xl mb-12">
-            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-violet-600 mb-2">Role Specifications</h2>
+            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-600 mb-2">Role Specifications</h2>
             <p className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight">
               Operational Features by Stakeholder Role
             </p>
@@ -289,9 +289,9 @@ export const LandingPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
             {/* Persona 1: Management Committee */}
-            <div className="p-6 rounded-sm bg-violet-50/40 border border-violet-100 space-y-4">
-              <div className="flex items-center gap-3 pb-3 border-b border-violet-200/80">
-                <div className="w-8 h-8 rounded-sm bg-violet-100 flex items-center justify-center text-violet-700">
+            <div className="p-6 rounded-xl bg-indigo-50/40 border border-indigo-100 space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-indigo-200/80">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700">
                   <Building2 className="w-4 h-4" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900">For Executive Committees & Admins</h3>
@@ -299,28 +299,28 @@ export const LandingPage: React.FC = () => {
 
               <ul className="space-y-2 text-xs text-slate-700 font-mono">
                 <li className="flex items-start gap-2">
-                  <span className="text-violet-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span>Batch invoice dispatch with custom flat amount overrides</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-violet-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span>Automated Razorpay settlement logging & bank reconciliation</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-violet-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span>Resident registration approval queue with block & flat verification</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-violet-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span>Vendor expense ledger with digital payout approval records</span>
                 </li>
               </ul>
             </div>
 
             {/* Persona 2: Resident Owners & Tenants */}
-            <div className="p-6 rounded-sm bg-violet-50/40 border border-violet-100 space-y-4">
-              <div className="flex items-center gap-3 pb-3 border-b border-violet-200/80">
-                <div className="w-8 h-8 rounded-sm bg-violet-100 flex items-center justify-center text-violet-700">
+            <div className="p-6 rounded-xl bg-indigo-50/40 border border-indigo-100 space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-indigo-200/80">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700">
                   <Users className="w-4 h-4" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900">For Resident Owners & Tenants</h3>
@@ -328,19 +328,19 @@ export const LandingPage: React.FC = () => {
 
               <ul className="space-y-2 text-xs text-slate-700 font-mono">
                 <li className="flex items-start gap-2">
-                  <span className="text-violet-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span>1-Click Razorpay UPI / Credit Card maintenance payment</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-violet-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span>Instant PDF receipt generation with verifiable transaction IDs</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-violet-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span>Grievance ticket submission with photo attachments & technician updates</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-violet-600 font-bold">•</span>
+                  <span className="text-indigo-600 font-bold">•</span>
                   <span>Direct emergency contacts directory (Security, Electrical, Plumbing)</span>
                 </li>
               </ul>
@@ -360,7 +360,7 @@ export const LandingPage: React.FC = () => {
             {/* Column 1: System Info */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-sm bg-violet-600 flex items-center justify-center text-white font-bold text-xs">
+                <div className="w-6 h-6 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
                   S
                 </div>
                 <span className="text-sm font-bold text-white">SocietyHub Platform</span>
@@ -396,7 +396,7 @@ export const LandingPage: React.FC = () => {
               <p className="text-xs text-slate-400 font-mono leading-relaxed">
                 All communications encrypted via SSL/TLS. Payment processing powered by Razorpay.
               </p>
-              <div className="mt-2 text-[11px] font-mono text-violet-400">
+              <div className="mt-2 text-[11px] font-mono text-indigo-400">
                 STATUS: 256-BIT ENCRYPTED
               </div>
             </div>

@@ -11,10 +11,11 @@ import {
   useDeleteAnnouncementMutation,
   useTogglePinAnnouncementMutation,
 } from '../../hooks/queries/useAnnouncements';
+import { AnnouncementsSkeleton } from '../../components/skeleton';
 
 export const AnnouncementsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const { data: announcements = [] } = useAnnouncementsQuery();
+  const { data: announcements = [], isLoading } = useAnnouncementsQuery();
   const createAnnouncementMutation = useCreateAnnouncementMutation();
   const deleteAnnouncementMutation = useDeleteAnnouncementMutation();
   const togglePinAnnouncementMutation = useTogglePinAnnouncementMutation();
@@ -79,6 +80,10 @@ export const AnnouncementsTab: React.FC = () => {
       },
     });
   };
+
+  if (isLoading && announcements.length === 0) {
+    return <AnnouncementsSkeleton />;
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">

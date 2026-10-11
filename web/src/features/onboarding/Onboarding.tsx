@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store';
-import { societyAPI, onboardingAPI } from '../../services/api';
+import { societyAPI, onboardingAPI, flatsAPI } from '../../services/api';
 import type { Society, SocietyFlatSummary, CreateSocietyFlat } from '../../types';
 import { Building2, LogOut, Home, Landmark } from 'lucide-react';
 import { PendingApprovalNotice } from './components/PendingApprovalNotice';
@@ -56,8 +56,28 @@ export const Onboarding: React.FC = () => {
     if (selectedSocietyId) {
       setLoadingFlats(true);
       societyAPI.listFlatsForSociety(selectedSocietyId)
-        .then(setFlats)
-        .catch(console.error)
+        .then(async (result) => {
+          if (result && result.length > 0) {
+            setFlats(result);
+          } else {
+            // Fallback: check all flats in case society linkage was not indexed
+            try {
+              const allFlats = await flatsAPI.list();
+              setFlats(allFlats);
+            } catch {
+              setFlats([]);
+            }
+          }
+        })
+        .catch(async (err) => {
+          console.error(err);
+          try {
+            const allFlats = await flatsAPI.list();
+            setFlats(allFlats);
+          } catch {
+            setFlats([]);
+          }
+        })
         .finally(() => setLoadingFlats(false));
     } else {
       setFlats([]);
@@ -120,7 +140,7 @@ export const Onboarding: React.FC = () => {
         flats: generatedFlats,
       });
       await refreshUser();
-      navigate('/dashboard');
+      navigate('/');
     } catch (err: unknown) {
       const errorObj = err as { response?: { data?: { detail?: string } } };
       setCreateError(errorObj.response?.data?.detail || 'Failed to create society.');

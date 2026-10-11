@@ -62,6 +62,8 @@ class UserOut(BaseModel):
     flat_id: Optional[str] = None
     # Optional ID of the society the user belongs to
     society_id: Optional[str] = None
+    # Optional name of the society the user belongs to
+    society_name: Optional[str] = None
     # Optional categorization of the resident (e.g., 'owner', 'renter')
     resident_type: Optional[str] = None
     # General approval status flag

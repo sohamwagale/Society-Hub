@@ -81,8 +81,8 @@ export const ReimbursementDetailsModal: React.FC<ReimbursementDetailsModalProps>
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="modal-overlay">
+      <div className="modal-panel bg-white border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex justify-between items-start p-5 border-b border-slate-100 bg-slate-50/50">
           <div>

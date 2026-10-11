@@ -9,10 +9,11 @@ import { confirmDialog } from '../../components/ConfirmModal';
 import { useFlatsQuery, useCreateFlatMutation, useAssignFlatMutation } from '../../hooks/queries/useFlats';
 import { usePendingApprovalsQuery, useApproveResidentMutation } from '../../hooks/queries/useApprovals';
 import { useResidentsQuery } from '../../hooks/queries/useResidents';
+import { FlatsSkeleton } from '../../components/skeleton';
 
 export const FlatsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const { data: rawFlats = [] } = useFlatsQuery();
+  const { data: rawFlats = [], isLoading } = useFlatsQuery();
   const flats = [...rawFlats].sort((a, b) => a.flat_number.localeCompare(b.flat_number));
   const { data: pendingApprovals = [] } = usePendingApprovalsQuery();
   const { data: activeResidents = [] } = useResidentsQuery();
@@ -97,6 +98,10 @@ export const FlatsTab: React.FC = () => {
   );
 
   if (user?.role !== 'admin') return null;
+
+  if (isLoading && rawFlats.length === 0) {
+    return <FlatsSkeleton />;
+  }
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { authAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
+import { SettingsSkeleton } from '../../components/skeleton';
 
 export const SettingsTab: React.FC = () => {
   const { user, refreshUser } = useAuthStore();
@@ -11,6 +12,10 @@ export const SettingsTab: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsError, setSettingsError] = useState('');
+
+  if (!user) {
+    return <SettingsSkeleton />;
+  }
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();

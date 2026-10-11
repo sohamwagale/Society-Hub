@@ -12,10 +12,11 @@ import {
   useUpdateComplaintMutation,
   useAddComplaintCommentMutation,
 } from '../../hooks/queries/useComplaints';
+import { ComplaintsSkeleton } from '../../components/skeleton';
 
 export const ComplaintsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const { data: complaints = [] } = useComplaintsQuery();
+  const { data: complaints = [], isLoading } = useComplaintsQuery();
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const { data: comments = [] } = useComplaintCommentsQuery(selectedComplaint ? selectedComplaint.id : null);
   const [commentInput, setCommentInput] = useState('');
@@ -87,6 +88,10 @@ export const ComplaintsTab: React.FC = () => {
       toast.error('Failed to update ticket status.');
     }
   };
+
+  if (isLoading && complaints.length === 0) {
+    return <ComplaintsSkeleton />;
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.flat import Flat
+from app.models.society import Society
 from app.schemas.user import UserOut, UserUpdate, ChangePasswordRequest, PushTokenRequest
 from app.core.security import hash_password, verify_password
 from app.core.deps import get_current_user
@@ -17,10 +18,12 @@ def get_me(
     db: Session = Depends(get_db)
 ):
     flat = db.query(Flat).filter(Flat.id == current_user.flat_id).first() if current_user.flat_id else None
+    society = db.query(Society).filter(Society.id == current_user.society_id).first() if current_user.society_id else None
     user_data = UserOut.model_validate(current_user).model_dump()
     user_data["flat_number"] = flat.flat_number if flat else None
     user_data["block"] = flat.block if flat else None
     user_data["floor"] = flat.floor if flat else None
+    user_data["society_name"] = society.name if society else None
     user_data["payment_address"] = current_user.payment_address
     user_data["is_fully_approved"] = current_user.is_fully_approved
     return user_data

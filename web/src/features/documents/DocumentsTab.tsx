@@ -11,10 +11,11 @@ import {
   useApproveDocumentMutation,
   useDeleteDocumentMutation,
 } from '../../hooks/queries/useDocuments';
+import { DocumentsSkeleton } from '../../components/skeleton';
 
 export const DocumentsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const { data: documents = [] } = useDocumentsQuery();
+  const { data: documents = [], isLoading } = useDocumentsQuery();
   const uploadDocumentMutation = useUploadDocumentMutation();
   const approveDocumentMutation = useApproveDocumentMutation();
   const deleteDocumentMutation = useDeleteDocumentMutation();
@@ -74,6 +75,10 @@ export const DocumentsTab: React.FC = () => {
       },
     });
   };
+
+  if (isLoading && documents.length === 0) {
+    return <DocumentsSkeleton />;
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">

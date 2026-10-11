@@ -12,10 +12,11 @@ import {
   useReviewReimbursementMutation,
   useMarkReimbursementPaidMutation,
 } from '../../hooks/queries/useReimbursements';
+import { ReimbursementsSkeleton } from '../../components/skeleton';
 
 export const ReimbursementsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const { data: reimbursements = [] } = useReimbursementsQuery();
+  const { data: reimbursements = [], isLoading } = useReimbursementsQuery();
   const createReimbursementMutation = useCreateReimbursementMutation();
   const reviewReimbursementMutation = useReviewReimbursementMutation();
   const markPaidMutation = useMarkReimbursementPaidMutation();
@@ -142,6 +143,10 @@ export const ReimbursementsTab: React.FC = () => {
     setSelectedReimbursement(r);
     setIsDetailsModalOpen(true);
   };
+
+  if (isLoading && reimbursements.length === 0) {
+    return <ReimbursementsSkeleton />;
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">

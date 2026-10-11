@@ -1,42 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store';
 import { notificationsAPI, onboardingAPI } from '../../services/api';
 import type { Notification } from '../../types';
+import { useIsMdUp } from '../../hooks/useMediaQuery';
+import { NOTIF_TYPE_TO_PATH, pathToTab } from './navConfig';
 
-// Shell components
 import DashboardSidebar from './components/DashboardSidebar';
 import DashboardHeader from './components/DashboardHeader';
-import OverviewTab from './components/OverviewTab';
-
-// Feature Views
-import AnnouncementsTab from '../announcements/AnnouncementsTab';
-import ResidentsTab from '../residents/ResidentsTab';
-import BillingTab from '../billing/BillingTab';
-import ComplaintsTab from '../complaints/ComplaintsTab';
-import DocumentsTab from '../documents/DocumentsTab';
-import ExpensesTab from '../expenses/ExpensesTab';
-import ReimbursementsTab from '../reimbursements/ReimbursementsTab';
-import PollsTab from '../polls/PollsTab';
-import EmergencyInfoTab from '../emergency/EmergencyInfoTab';
-import FlatsTab from '../flats/FlatsTab';
-import ApprovalsTab from '../approvals/ApprovalsTab';
-import ActivityLogTab from '../activityLog/ActivityLogTab';
-import SettingsTab from '../settings/SettingsTab';
+import MobileBottomNav from './components/MobileBottomNav';
+import CommandPalette from './components/CommandPalette';
 
 export const Dashboard: React.FC = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isMdUp = useIsMdUp();
 
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth >= 768 : true
-  );
-
-  // Global Header Notifications & Approvals State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(isMdUp);
+  const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
+
+  const activeTab = pathToTab(location.pathname);
+
+  useEffect(() => {
+    setIsSidebarOpen(isMdUp);
+  }, [isMdUp]);
 
   useEffect(() => {
     if (!user) {
@@ -53,9 +44,8 @@ export const Dashboard: React.FC = () => {
           .catch(console.error);
       }
     }
-  }, [user, navigate, activeTab]);
+  }, [user, navigate, location.pathname]);
 
-  // Auto-clear tab notification count bubbles when opening that tab
   useEffect(() => {
     const tabTypeMap: Record<string, string[]> = {
       billing: ['bill', 'payment_reminder'],
@@ -74,14 +64,23 @@ export const Dashboard: React.FC = () => {
         unreadForTab.forEach((n) => notificationsAPI.markRead(n.id).catch(console.error));
         setNotifications((prev) =>
           prev.map((n) =>
-            !n.is_read && matchingTypes.includes(n.notification_type)
-              ? { ...n, is_read: true }
-              : n
+            !n.is_read && matchingTypes.includes(n.notification_type) ? { ...n, is_read: true } : n
           )
         );
       }
     }
   }, [activeTab, notifications]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setIsCommandOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const handleLogoutClick = async () => {
     await logout();
@@ -125,21 +124,9 @@ export const Dashboard: React.FC = () => {
     }
 
     setIsNotificationOpen(false);
-
-    const typeMap: Record<string, string> = {
-      bill: 'billing',
-      payment_reminder: 'billing',
-      complaint: 'complaints',
-      reimbursement: 'reimbursements',
-      poll: 'polls',
-      general: 'announcements',
-    };
-
-    const targetTab = typeMap[notif.notification_type] || 'dashboard';
-    setActiveTab(targetTab);
+    navigate(NOTIF_TYPE_TO_PATH[notif.notification_type] || '/');
   };
 
-  // Compute unread/pending notification bubble counts for sidebar tabs
   const tabBadges: Record<string, number> = {
     approvals: pendingApprovalsCount,
     billing: notifications.filter(
@@ -152,22 +139,19 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
-      {/* Sidebar */}
+    <div className="flex h-dvh bg-slate-50 font-sans overflow-hidden">
       <DashboardSidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        onNavigate={(path) => navigate(path)}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
+        isMdUp={isMdUp}
         user={user}
         onLogout={handleLogoutClick}
-        onResetSelections={() => {}}
         tabBadges={tabBadges}
       />
 
-      {/* Main Content Viewport */}
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Header */}
+      <main className="flex-1 flex flex-col overflow-hidden relative min-w-0">
         <DashboardHeader
           user={user}
           isSidebarOpen={isSidebarOpen}
@@ -179,28 +163,34 @@ export const Dashboard: React.FC = () => {
           onClearAll={handleClearAllNotifications}
           onNotificationClick={handleNotificationClick}
           onClearNotification={handleClearNotificationItem}
+          onOpenCommand={() => setIsCommandOpen(true)}
+          onOpenSettings={() => navigate('/settings')}
         />
 
-        {/* Dynamic Nested Feature Views */}
-        <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 bg-slate-50">
+        <div className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50 pb-24 md:pb-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            {activeTab === 'dashboard' && <OverviewTab />}
-            {activeTab === 'announcements' && <AnnouncementsTab />}
-            {activeTab === 'residents' && <ResidentsTab />}
-            {activeTab === 'billing' && <BillingTab />}
-            {activeTab === 'complaints' && <ComplaintsTab />}
-            {activeTab === 'documents' && <DocumentsTab />}
-            {activeTab === 'expenses' && <ExpensesTab />}
-            {activeTab === 'reimbursements' && <ReimbursementsTab />}
-            {activeTab === 'polls' && <PollsTab />}
-            {activeTab === 'emergency' && <EmergencyInfoTab />}
-            {activeTab === 'flats' && user?.role === 'admin' && <FlatsTab />}
-            {activeTab === 'approvals' && (user?.role === 'admin' || user?.resident_type === 'owner' || user?.resident_type === 'renter') && <ApprovalsTab />}
-            {activeTab === 'activity-log' && user?.role === 'admin' && <ActivityLogTab />}
-            {activeTab === 'settings' && <SettingsTab />}
+            <Outlet />
           </div>
         </div>
       </main>
+
+      <MobileBottomNav
+        activePath={location.pathname}
+        onNavigate={(path) => {
+          navigate(path);
+          setIsSidebarOpen(false);
+        }}
+        onMore={() => setIsSidebarOpen(!isSidebarOpen)}
+        moreOpen={isSidebarOpen}
+        user={user}
+      />
+
+      <CommandPalette
+        isOpen={isCommandOpen}
+        onClose={() => setIsCommandOpen(false)}
+        onNavigate={(path) => navigate(path)}
+        user={user}
+      />
     </div>
   );
 };

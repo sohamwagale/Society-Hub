@@ -49,10 +49,10 @@ export const CreateBillModal: React.FC<CreateBillModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="modal-overlay">
       <form
         onSubmit={onSubmit}
-        className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-lg space-y-4 relative overflow-hidden max-h-[90vh] flex flex-col"
+        className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-lg space-y-4 relative overflow-hidden max-h-[90vh] flex flex-col"
       >
         <SuccessTickOverlay show={isSuccess} message="Bill Cycle Generated!" />
 

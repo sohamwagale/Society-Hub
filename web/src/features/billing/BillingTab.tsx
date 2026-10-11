@@ -11,6 +11,7 @@ import { BillCard } from './components/BillCard';
 import { FlatAuditPanel } from './components/FlatAuditPanel';
 import { toast } from '../../components/Toast';
 import { confirmDialog } from '../../components/ConfirmModal';
+import { BillingSkeleton } from '../../components/skeleton';
 import {
   useBillsQuery,
   usePaymentHistoryQuery,
@@ -28,7 +29,7 @@ interface RazorpayResponse {
 
 export const BillingTab: React.FC = () => {
   const { user } = useAuthStore();
-  const { data: bills = [] } = useBillsQuery();
+  const { data: bills = [], isLoading: loadingBills } = useBillsQuery();
   const { data: paymentHistory = [] } = usePaymentHistoryQuery();
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
   const { data: complianceList = [], isLoading: loadingCompliance } = useBillResidentStatusQuery(selectedBillId);
@@ -169,6 +170,10 @@ export const BillingTab: React.FC = () => {
       toast.error('Failed to upload receipt.');
     }
   };
+
+  if (loadingBills && bills.length === 0) {
+    return <BillingSkeleton />;
+  }
 
   return (
     <div className="space-y-6 font-sans">

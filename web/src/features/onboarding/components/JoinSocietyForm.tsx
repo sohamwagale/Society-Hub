@@ -63,24 +63,27 @@ export const JoinSocietyForm: React.FC<JoinSocietyFormProps> = ({
 
       <div>
         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Society Name</label>
-        <select
-          disabled={loadingSocieties}
-          value={selectedSocietyId}
-          onChange={(e) => setSelectedSocietyId(e.target.value)}
-          className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-        >
-          <option value="">-- Select Society --</option>
-          {societies.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
+        {loadingSocieties ? (
+          <div className="skeleton-shimmer h-9.5 w-full rounded-lg bg-slate-200" />
+        ) : (
+          <select
+            value={selectedSocietyId}
+            onChange={(e) => setSelectedSocietyId(e.target.value)}
+            className="block w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option value="">-- Select Society --</option>
+            {societies.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {selectedSocietyId && (
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-1.5">Select Flat</label>
           {loadingFlats ? (
-            <div className="text-xs text-slate-500">Loading society flats...</div>
+            <div className="skeleton-shimmer h-9.5 w-full rounded-lg bg-slate-200" />
           ) : (
             <select
               value={selectedFlatId}
@@ -90,10 +93,15 @@ export const JoinSocietyForm: React.FC<JoinSocietyFormProps> = ({
               <option value="">-- Select Flat Number --</option>
               {flats.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.block} Block - Flat {f.flat_number} (Floor {f.floor})
+                  {f.block ? `${f.block} Block - ` : ''}Flat {f.flat_number} {f.floor ? `(Floor ${f.floor})` : ''}
                 </option>
               ))}
             </select>
+          )}
+          {!loadingFlats && flats.length === 0 && (
+            <p className="text-xs text-amber-600 mt-1.5">
+              No flats currently registered for this society.
+            </p>
           )}
         </div>
       )}

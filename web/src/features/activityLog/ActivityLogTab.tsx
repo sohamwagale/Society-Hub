@@ -3,6 +3,7 @@ import { ShieldCheck, RefreshCw, Filter, ChevronLeft, ChevronRight, Activity, Do
 import { activityLogAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import { useActivityLogsQuery } from '../../hooks/queries/useActivityLogs';
+import { ActivityLogSkeleton } from '../../components/skeleton';
 
 export const ActivityLogTab: React.FC = () => {
   const { user } = useAuthStore();
@@ -17,13 +18,16 @@ export const ActivityLogTab: React.FC = () => {
     refetch,
   } = useActivityLogsQuery(page * limit, limit, selectedEntity || undefined);
 
-
   if (user?.role !== 'admin') {
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-8 text-center font-sans">
         <p className="text-slate-500 text-sm">Access Restricted. Administrative privileges required.</p>
       </div>
     );
+  }
+
+  if (loading && logs.length === 0) {
+    return <ActivityLogSkeleton />;
   }
 
   const formatTimestamp = (dateStr: string) => {
@@ -122,15 +126,16 @@ export const ActivityLogTab: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {loading && logs.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-400">
-                  <div className="flex items-center justify-center gap-2">
-                    <RefreshCw className="animate-spin text-indigo-600" size={18} />
-                    <span>Loading audit records...</span>
-                  </div>
-                </td>
-              </tr>
+            {isFetching && logs.length === 0 ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-b border-slate-100">
+                  <td className="py-3.5 px-4"><div className="skeleton-shimmer h-3 w-24 rounded bg-slate-200" /></td>
+                  <td className="py-3.5 px-4"><div className="skeleton-shimmer h-3.5 w-20 rounded bg-slate-200" /></td>
+                  <td className="py-3.5 px-4"><div className="skeleton-shimmer h-3 w-28 rounded bg-slate-200" /></td>
+                  <td className="py-3.5 px-4"><div className="skeleton-shimmer h-4 w-16 rounded bg-slate-200" /></td>
+                  <td className="py-3.5 px-4"><div className="skeleton-shimmer h-3 w-36 rounded bg-slate-200" /></td>
+                </tr>
+              ))
             ) : logs.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-12 text-center text-slate-400">

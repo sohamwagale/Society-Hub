@@ -11,10 +11,11 @@ import {
   useClosePollMutation,
   useDeletePollMutation,
 } from '../../hooks/queries/usePolls';
+import { PollsSkeleton } from '../../components/skeleton';
 
 export const PollsTab: React.FC = () => {
   const { user } = useAuthStore();
-  const { data: polls = [] } = usePollsQuery();
+  const { data: polls = [], isLoading } = usePollsQuery();
   const createPollMutation = useCreatePollMutation();
   const votePollMutation = useVotePollMutation();
   const closePollMutation = useClosePollMutation();
@@ -91,6 +92,10 @@ export const PollsTab: React.FC = () => {
       },
     });
   };
+
+  if (isLoading && polls.length === 0) {
+    return <PollsSkeleton />;
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">

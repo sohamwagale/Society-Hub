@@ -22,8 +22,8 @@ export const EditSocietyInfoModal: React.FC<EditSocietyInfoModalProps> = ({
   const formatKey = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4">
+    <div className="modal-overlay">
+      <form onSubmit={onSubmit} className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4">
         <h3 className="font-bold text-slate-800 text-lg">Modify {formatKey(editInfoKey)}</h3>
         <div>
           <label className="block text-xs font-semibold text-slate-600 mb-1">Updated Value</label>

@@ -69,10 +69,10 @@ export const CustomFlatPricesModal: React.FC<CustomFlatPricesModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="modal-overlay">
       <form
         onSubmit={handleSave}
-        className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-lg space-y-4 relative overflow-hidden flex flex-col max-h-[85vh]"
+        className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-lg space-y-4 relative overflow-hidden flex flex-col max-h-[85vh]"
       >
         <div className="flex justify-between items-start shrink-0">
           <div>

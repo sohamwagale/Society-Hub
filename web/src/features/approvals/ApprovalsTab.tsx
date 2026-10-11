@@ -3,11 +3,12 @@ import { Check, X } from 'lucide-react';
 import { useAuthStore } from '../../store';
 import { toast } from '../../components/Toast';
 import { usePendingApprovalsQuery, useApproveResidentMutation } from '../../hooks/queries/useApprovals';
+import { ApprovalsSkeleton } from '../../components/skeleton';
 
 export const ApprovalsTab: React.FC = () => {
   const { user } = useAuthStore();
   const canViewApprovals = user?.role === 'admin' || user?.resident_type === 'owner' || user?.resident_type === 'renter';
-  const { data: pendingApprovals = [] } = usePendingApprovalsQuery();
+  const { data: pendingApprovals = [], isLoading } = usePendingApprovalsQuery();
   const approveResidentMutation = useApproveResidentMutation();
 
   const handleApprovePendingUser = async (id: string, approve: boolean) => {
@@ -20,6 +21,10 @@ export const ApprovalsTab: React.FC = () => {
   };
 
   if (!canViewApprovals) return null;
+
+  if (isLoading && pendingApprovals.length === 0) {
+    return <ApprovalsSkeleton />;
+  }
 
   const getHeaderInfo = () => {
     if (user?.role === 'admin') {

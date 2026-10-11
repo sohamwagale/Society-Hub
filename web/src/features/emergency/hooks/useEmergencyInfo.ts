@@ -21,8 +21,10 @@ export function useEmergencyInfo() {
   const [editInfoValue, setEditInfoValue] = useState('');
   const [newInfoKey, setNewInfoKey] = useState('');
   const [newInfoValue, setNewInfoValue] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
+    setIsLoading(true);
     try {
       const [contacts, info] = await Promise.all([
         societyAPI.getEmergencyContacts(),
@@ -32,6 +34,8 @@ export function useEmergencyInfo() {
       setSocietyInfo(info);
     } catch (e) {
       console.error(e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -200,5 +204,6 @@ export function useEmergencyInfo() {
     handleAddSocietyInfo,
     openAddEmergencyModal,
     openEditSocietyInfoModal,
+    isLoading,
   };
 }

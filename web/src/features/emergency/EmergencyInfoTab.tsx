@@ -4,10 +4,15 @@ import { useEmergencyInfo } from './hooks/useEmergencyInfo';
 import { SocietyInfoGrid } from './components/SocietyInfoGrid';
 import { EmergencyContactsBook } from './components/EmergencyContactsBook';
 import { EmergencyModalsManager } from './components/EmergencyModalsManager';
+import { EmergencySkeleton } from '../../components/skeleton';
 
 export const EmergencyInfoTab: React.FC = () => {
   const { user } = useAuthStore();
   const infoState = useEmergencyInfo();
+
+  if (infoState.isLoading) {
+    return <EmergencySkeleton />;
+  }
 
   return (
     <div className="space-y-6">

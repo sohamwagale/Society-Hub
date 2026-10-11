@@ -16,8 +16,8 @@ export const UploadReceiptModal: React.FC<UploadReceiptModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4">
+    <div className="modal-overlay">
+      <form onSubmit={onSubmit} className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4">
         <h3 className="font-bold text-slate-800 text-lg">Upload manual Receipt / Proof</h3>
         <p className="text-xs text-slate-500">
           Attach the photo/PDF of your physical payment voucher or bank transfer receipt for verification.

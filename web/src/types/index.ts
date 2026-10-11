@@ -8,6 +8,7 @@ export interface User {
   role: 'resident' | 'admin';
   flat_id?: string;
   society_id?: string;
+  society_name?: string;
   resident_type?: ResidentType;
   is_approved: boolean;
   is_approved_by_admin: boolean;

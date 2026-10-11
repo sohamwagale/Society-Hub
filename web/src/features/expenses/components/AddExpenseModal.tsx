@@ -35,8 +35,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4 relative overflow-hidden">
+    <div className="modal-overlay">
+      <form onSubmit={onSubmit} className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4 relative overflow-hidden">
         <SuccessTickOverlay show={isSuccess} message="Society Expense Logged!" />
 
         <h3 className="font-bold text-slate-800 text-lg">Log Society Expense</h3>

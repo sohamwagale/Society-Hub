@@ -49,8 +49,8 @@ export const CreatePollModal: React.FC<CreatePollModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto relative">
+    <div className="modal-overlay">
+      <form onSubmit={onSubmit} className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto relative">
         <SuccessTickOverlay show={isSuccess} message="Survey Poll Launched!" />
 
         <h3 className="font-bold text-slate-800 text-lg">Launch Opinion Poll</h3>

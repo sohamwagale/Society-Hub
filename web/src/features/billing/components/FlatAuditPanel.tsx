@@ -22,7 +22,17 @@ export const FlatAuditPanel: React.FC<FlatAuditPanelProps> = ({
           Select "View Flat Audits" on any billing card to audit flat compliance.
         </p>
       ) : loadingCompliance ? (
-        <div className="text-xs text-slate-500">Loading audit records...</div>
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex justify-between items-center p-2.5 bg-slate-50 rounded border border-slate-100">
+              <div className="space-y-1">
+                <div className="skeleton-shimmer h-3.5 w-14 rounded bg-slate-200" />
+                <div className="skeleton-shimmer h-2.5 w-24 rounded bg-slate-200" />
+              </div>
+              <div className="skeleton-shimmer h-4 w-12 rounded bg-slate-200" />
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="space-y-3.5 max-h-[380px] overflow-y-auto">
           <p className="text-xs text-slate-600 font-semibold mb-2">
