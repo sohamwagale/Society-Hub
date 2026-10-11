@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import type { BillCreate, BillType, FlatAmountOverride } from '../../../types';
 import SuccessTickOverlay from '../../../components/SuccessTickOverlay';
+import ModalShell from '../../../components/ui/ModalShell';
 import { useFlatsQuery } from '../../../hooks/queries/useFlats';
 
 interface CreateBillModalProps {
@@ -49,7 +50,7 @@ export const CreateBillModal: React.FC<CreateBillModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay">
+    <ModalShell isOpen={isOpen} onClose={onClose}>
       <form
         onSubmit={onSubmit}
         className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-lg space-y-4 relative overflow-hidden max-h-[90vh] flex flex-col"
@@ -232,7 +233,7 @@ export const CreateBillModal: React.FC<CreateBillModalProps> = ({
           </button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 };
 

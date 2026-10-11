@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
+import ModalShell from '../../../components/ui/ModalShell';
 import type { Flat, ResidentInfo } from '../../../types';
 
 interface AssignResidentModalProps {
@@ -30,7 +31,7 @@ export const AssignResidentModal: React.FC<AssignResidentModalProps> = ({
   );
 
   return (
-    <div className="modal-overlay">
+    <ModalShell isOpen={isOpen} onClose={onClose}>
       <div className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md flex flex-col h-[400px]">
         <div className="flex justify-between items-center pb-2 border-b border-slate-100 mb-4">
           <h3 className="font-bold text-slate-800 text-lg">Locate Occupant for {selectedFlat.flat_number}</h3>
@@ -71,7 +72,7 @@ export const AssignResidentModal: React.FC<AssignResidentModalProps> = ({
           ))}
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 };
 

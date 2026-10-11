@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, BarChart3 } from 'lucide-react';
 import { useAuthStore } from '../../store';
 import CreatePollModal from './components/CreatePollModal';
 import { toast } from '../../components/Toast';
 import { confirmDialog } from '../../components/ConfirmModal';
+import EmptyState from '../../components/ui/EmptyState';
 import {
   usePollsQuery,
   useCreatePollMutation,
@@ -107,7 +108,7 @@ export const PollsTab: React.FC = () => {
         {user?.role === 'admin' && (
           <button
             onClick={() => setIsModalOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
+            className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 min-h-11 shadow-sm"
           >
             <Plus size={16} /> Launch Poll
           </button>
@@ -116,7 +117,24 @@ export const PollsTab: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {polls.length === 0 ? (
-          <p className="col-span-full text-slate-400 text-sm text-center py-12">No community surveys listed.</p>
+          <div className="col-span-full">
+            <EmptyState
+              icon={BarChart3}
+              title="No community polls active"
+              description="Opinions, elections, and society resolutions will appear here when posted by the committee."
+              action={
+                user?.role === 'admin' ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl min-h-11 shadow-sm transition-colors"
+                  >
+                    Launch first poll
+                  </button>
+                ) : undefined
+              }
+            />
+          </div>
         ) : (
           polls.map((poll) => {
             const totalVotes = poll.options.reduce((acc, curr) => acc + curr.vote_count, 0);

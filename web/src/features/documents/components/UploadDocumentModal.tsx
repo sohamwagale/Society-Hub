@@ -1,5 +1,5 @@
-import React from 'react';
 import SuccessTickOverlay from '../../../components/SuccessTickOverlay';
+import ModalShell from '../../../components/ui/ModalShell';
 
 interface UploadDocumentModalProps {
   isOpen: boolean;
@@ -27,7 +27,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay">
+    <ModalShell isOpen={isOpen} onClose={onClose}>
       <form onSubmit={onSubmit} className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4 relative overflow-hidden">
         <SuccessTickOverlay show={isSuccess} message="Document Uploaded Successfully!" />
 
@@ -71,7 +71,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
           </button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 };
 

@@ -13,6 +13,7 @@ import {
   useAddComplaintCommentMutation,
 } from '../../hooks/queries/useComplaints';
 import { ComplaintsSkeleton } from '../../components/skeleton';
+import EmptyState from '../../components/ui/EmptyState';
 
 export const ComplaintsTab: React.FC = () => {
   const { user } = useAuthStore();
@@ -94,17 +95,17 @@ export const ComplaintsTab: React.FC = () => {
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 font-sans">
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 font-sans">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-100 mb-6">
         <div>
           <h3 className="font-bold text-slate-800 text-lg">Helpdesk Grievances</h3>
-          <p className="text-slate-500 text-xs mt-1">
+          <p className="text-slate-500 text-sm mt-1">
             Submit support tickets, communicate with board members, or manage status.
           </p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
+          className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 min-h-11 shadow-sm"
         >
           <Plus size={16} /> Raise Ticket
         </button>
@@ -113,7 +114,20 @@ export const ComplaintsTab: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           {complaints.length === 0 ? (
-            <p className="text-slate-400 text-sm py-12 text-center">No active complaints logged.</p>
+            <EmptyState
+              icon={HelpCircle}
+              title="No tickets logged"
+              description="Everything is running smoothly! If you have any maintenance issue or grievance, submit a ticket."
+              action={
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl min-h-11 shadow-sm transition-colors"
+                >
+                  Raise first ticket
+                </button>
+              }
+            />
           ) : (
             complaints.map((c) => (
               <div

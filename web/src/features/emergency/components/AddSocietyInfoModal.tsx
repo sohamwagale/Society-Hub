@@ -1,4 +1,5 @@
 import React from 'react';
+import ModalShell from '../../../components/ui/ModalShell';
 
 interface AddSocietyInfoModalProps {
   isOpen: boolean;
@@ -19,10 +20,8 @@ export const AddSocietyInfoModal: React.FC<AddSocietyInfoModalProps> = ({
   newInfoValue,
   setNewInfoValue
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="modal-overlay">
+    <ModalShell isOpen={isOpen} onClose={onClose}>
       <form onSubmit={onSubmit} className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4">
         <h3 className="font-bold text-slate-800 text-lg">New Society Attribute</h3>
         <div>
@@ -55,7 +54,7 @@ export const AddSocietyInfoModal: React.FC<AddSocietyInfoModalProps> = ({
           </button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 };
 

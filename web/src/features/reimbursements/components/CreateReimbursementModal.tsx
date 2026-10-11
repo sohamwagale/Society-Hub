@@ -1,5 +1,5 @@
-import React from 'react';
 import SuccessTickOverlay from '../../../components/SuccessTickOverlay';
+import ModalShell from '../../../components/ui/ModalShell';
 
 interface CreateReimbursementModalProps {
   isOpen: boolean;
@@ -43,7 +43,7 @@ export const CreateReimbursementModal: React.FC<CreateReimbursementModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay">
+    <ModalShell isOpen={isOpen} onClose={onClose}>
       <form onSubmit={onSubmit} className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto relative">
         <SuccessTickOverlay show={isSuccess} message="Reimbursement Claim Submitted!" />
 
@@ -139,7 +139,7 @@ export const CreateReimbursementModal: React.FC<CreateReimbursementModalProps> =
           </button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 };
 

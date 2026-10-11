@@ -4,6 +4,7 @@ import { activityLogAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
 import { useActivityLogsQuery } from '../../hooks/queries/useActivityLogs';
 import { ActivityLogSkeleton } from '../../components/skeleton';
+import EmptyState from '../../components/ui/EmptyState';
 
 export const ActivityLogTab: React.FC = () => {
   const { user } = useAuthStore();
@@ -113,70 +114,115 @@ export const ActivityLogTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Logs Table / List */}
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[550px] text-left text-xs border-collapse">
-          <thead>
-            <tr className="border-b border-slate-200 text-slate-400 font-semibold uppercase tracking-wider bg-slate-50/50">
-              <th className="py-3 px-4">Timestamp</th>
-              <th className="py-3 px-4">User</th>
-              <th className="py-3 px-4">Action</th>
-              <th className="py-3 px-4">Entity</th>
-              <th className="py-3 px-4">Details</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {isFetching && logs.length === 0 ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-b border-slate-100">
-                  <td className="py-3.5 px-4"><div className="skeleton-shimmer h-3 w-24 rounded bg-slate-200" /></td>
-                  <td className="py-3.5 px-4"><div className="skeleton-shimmer h-3.5 w-20 rounded bg-slate-200" /></td>
-                  <td className="py-3.5 px-4"><div className="skeleton-shimmer h-3 w-28 rounded bg-slate-200" /></td>
-                  <td className="py-3.5 px-4"><div className="skeleton-shimmer h-4 w-16 rounded bg-slate-200" /></td>
-                  <td className="py-3.5 px-4"><div className="skeleton-shimmer h-3 w-36 rounded bg-slate-200" /></td>
+      {/* Empty State */}
+      {!loading && logs.length === 0 && (
+        <EmptyState
+          icon={Activity}
+          title="No activity log entries found"
+          description={
+            selectedEntity
+              ? `No logs match the "${selectedEntity}" filter. Try switching back to All.`
+              : 'System-wide administrative actions and resident events will appear here.'
+          }
+          action={
+            selectedEntity ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedEntity('');
+                  setPage(0);
+                }}
+                className="bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-xl min-h-11"
+              >
+                Clear filter
+              </button>
+            ) : undefined
+          }
+        />
+      )}
+
+      {/* Logs Content */}
+      {logs.length > 0 && (
+        <>
+          {/* Mobile Card List */}
+          <div className="md:hidden space-y-3">
+            {logs.map((log) => (
+              <div
+                key={log.id}
+                className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2 text-sm"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-bold text-slate-800">{log.user_name}</span>
+                  {log.entity_type && (
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded text-xs font-bold border shrink-0 ${getEntityBadgeColor(
+                        log.entity_type
+                      )}`}
+                    >
+                      {log.entity_type.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <p className="font-medium text-slate-700">{log.action}</p>
+                {log.details && (
+                  <p className="text-xs text-slate-500 bg-white p-2.5 rounded-xl border border-slate-200/70">
+                    {log.details}
+                  </p>
+                )}
+                <p className="text-xs text-slate-400 text-right pt-1">
+                  {formatTimestamp(log.created_at)}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table */}
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-left text-sm border-collapse">
+              <thead className="sticky top-0 bg-slate-50 z-10">
+                <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase text-xs tracking-wider">
+                  <th className="py-3 px-4">Timestamp</th>
+                  <th className="py-3 px-4">User</th>
+                  <th className="py-3 px-4">Action</th>
+                  <th className="py-3 px-4">Entity</th>
+                  <th className="py-3 px-4">Details</th>
                 </tr>
-              ))
-            ) : logs.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-400">
-                  <Activity size={32} className="mx-auto mb-2 text-slate-300" />
-                  <p>No activity log entries found.</p>
-                </td>
-              </tr>
-            ) : (
-              logs.map((log) => (
-                <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                    {formatTimestamp(log.created_at)}
-                  </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-800">
-                    {log.user_name}
-                  </td>
-                  <td className="py-3.5 px-4 font-medium text-slate-700">
-                    {log.action}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    {log.entity_type ? (
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold border ${getEntityBadgeColor(
-                          log.entity_type
-                        )}`}
-                      >
-                        {log.entity_type.toUpperCase()}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-4 text-slate-600 max-w-xs truncate">
-                    {log.details || '—'}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {logs.map((log) => (
+                  <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap text-xs">
+                      {formatTimestamp(log.created_at)}
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-slate-800">
+                      {log.user_name}
+                    </td>
+                    <td className="py-3.5 px-4 font-medium text-slate-700">
+                      {log.action}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      {log.entity_type ? (
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-xs font-semibold border ${getEntityBadgeColor(
+                            log.entity_type
+                          )}`}
+                        >
+                          {log.entity_type.toUpperCase()}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-600 max-w-sm truncate text-xs">
+                      {log.details || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* Pagination Controls */}
       <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-xs text-slate-500">

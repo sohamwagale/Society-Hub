@@ -1,13 +1,6 @@
 import React, { useEffect } from 'react';
 
-interface ModalShellProps {
-  isOpen: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-  labelledBy?: string;
-}
-
-export const ModalShell: React.FC<ModalShellProps> = ({ isOpen, onClose, children, labelledBy }) => {
+export function useModalEscape(isOpen: boolean, onClose: () => void) {
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (event: KeyboardEvent) => {
@@ -16,6 +9,17 @@ export const ModalShell: React.FC<ModalShellProps> = ({ isOpen, onClose, childre
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
+}
+
+interface ModalShellProps {
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  labelledBy?: string;
+}
+
+export const ModalShell: React.FC<ModalShellProps> = ({ isOpen, onClose, children, labelledBy }) => {
+  useModalEscape(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -25,11 +29,11 @@ export const ModalShell: React.FC<ModalShellProps> = ({ isOpen, onClose, childre
       role="dialog"
       aria-modal="true"
       aria-labelledby={labelledBy}
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="contents" onClick={(event) => event.stopPropagation()}>
-        {children}
-      </div>
+      {children}
     </div>
   );
 };

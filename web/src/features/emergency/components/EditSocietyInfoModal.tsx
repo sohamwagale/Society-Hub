@@ -1,4 +1,5 @@
 import React from 'react';
+import ModalShell from '../../../components/ui/ModalShell';
 
 interface EditSocietyInfoModalProps {
   isOpen: boolean;
@@ -17,12 +18,10 @@ export const EditSocietyInfoModal: React.FC<EditSocietyInfoModalProps> = ({
   editInfoValue,
   setEditInfoValue
 }) => {
-  if (!isOpen) return null;
-
   const formatKey = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
   return (
-    <div className="modal-overlay">
+    <ModalShell isOpen={isOpen} onClose={onClose}>
       <form onSubmit={onSubmit} className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4">
         <h3 className="font-bold text-slate-800 text-lg">Modify {formatKey(editInfoKey)}</h3>
         <div>
@@ -44,7 +43,7 @@ export const EditSocietyInfoModal: React.FC<EditSocietyInfoModalProps> = ({
           </button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 };
 

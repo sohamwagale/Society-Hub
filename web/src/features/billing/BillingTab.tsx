@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Plus } from 'lucide-react';
+import { Download, Plus, CreditCard } from 'lucide-react';
 import type { Bill, BillCreate, BillPayment } from '../../types';
 import { billsAPI } from '../../services/api';
 import { useAuthStore } from '../../store';
@@ -12,6 +12,7 @@ import { FlatAuditPanel } from './components/FlatAuditPanel';
 import { toast } from '../../components/Toast';
 import { confirmDialog } from '../../components/ConfirmModal';
 import { BillingSkeleton } from '../../components/skeleton';
+import EmptyState from '../../components/ui/EmptyState';
 import {
   useBillsQuery,
   usePaymentHistoryQuery,
@@ -225,7 +226,26 @@ export const BillingTab: React.FC = () => {
           <div className="lg:col-span-2 space-y-4">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Billing Cycles</h4>
             {bills.length === 0 ? (
-              <p className="text-slate-400 text-sm py-8 text-center">No billing cycles defined.</p>
+              <EmptyState
+                icon={CreditCard}
+                title={user?.role === 'admin' ? 'No billing cycles created' : 'No bills due'}
+                description={
+                  user?.role === 'admin'
+                    ? 'Generate monthly maintenance cycles or special amenity charges for all residents.'
+                    : 'You have no outstanding or active maintenance dues from the committee.'
+                }
+                action={
+                  user?.role === 'admin' ? (
+                    <button
+                      type="button"
+                      onClick={() => setModalType('bill')}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl min-h-11 shadow-sm transition-colors"
+                    >
+                      Create first cycle
+                    </button>
+                  ) : undefined
+                }
+              />
             ) : (
               bills.map((bill) => (
                 <BillCard

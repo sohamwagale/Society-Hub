@@ -1,5 +1,6 @@
 import React from 'react';
 import { CheckCircle2, Download } from 'lucide-react';
+import { useModalEscape } from '../../../components/ui/ModalShell';
 import type { Bill, BillPayment } from '../../../types';
 import { billsAPI } from '../../../services/api';
 
@@ -16,11 +17,13 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
   onClose,
   onUploadScreenshot
 }) => {
+  useModalEscape(Boolean(payment && bill), onClose);
+
   if (!payment || !bill) return null;
 
   return (
     <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-8 w-full max-w-sm flex flex-col items-center text-center space-y-5 animate-in fade-in zoom-in duration-300">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xl p-8 w-full max-w-sm flex flex-col items-center text-center space-y-5 animate-in fade-in zoom-in duration-300">
         <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center shadow-lg border border-emerald-200/50">
           <CheckCircle2 size={44} />
         </div>
@@ -32,7 +35,7 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
           ₹{Number(payment.amount).toLocaleString('en-IN')}
         </p>
 
-        <div className="w-full bg-slate-50 border border-slate-150 rounded-2xl p-4 text-xs text-left space-y-2">
+        <div className="w-full bg-slate-50 border border-slate-150 rounded-lg p-4 text-xs text-left space-y-2">
           <div className="flex justify-between">
             <span className="text-slate-400">Method</span>
             <span className="font-bold text-slate-700">Razorpay</span>

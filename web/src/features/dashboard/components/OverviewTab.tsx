@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Pin, Trash2, Paperclip, PhoneCall, CreditCard, PenTool, Vote } from 'lucide-react';
+import { Plus, Pin, Trash2, Paperclip, PhoneCall, CreditCard, PenTool, Vote, TrendingUp, AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react';
 import type { EmergencyContact, Society, SocietyInfoItem } from '../../../types';
 import { announcementsAPI, societyAPI } from '../../../services/api';
 import { useAuthStore } from '../../../store';
@@ -124,6 +124,24 @@ export const OverviewTab: React.FC = () => {
   const activePolls = polls.filter((p) => p.is_active);
   const pinnedOrLatest = announcements.find((a) => a.pinned) || announcements[0];
 
+  // Computed Admin Analytics
+  const openComplaintsByCategory = complaints
+    .filter((c) => c.status !== 'resolved')
+    .reduce<Record<string, number>>((acc, c) => {
+      const cat = c.category || 'other';
+      acc[cat] = (acc[cat] || 0) + 1;
+      return acc;
+    }, {});
+
+  const totalOpenComplaints = Object.values(openComplaintsByCategory).reduce((a, b) => a + b, 0);
+  const totalResolvedComplaints = complaints.filter((c) => c.status === 'resolved').length;
+  const resolutionRate = complaints.length > 0 ? Math.round((totalResolvedComplaints / complaints.length) * 100) : 100;
+
+  const overdueBills = bills.filter((b) => b.payment_status === 'overdue');
+  const overdueTotalAmount = overdueBills.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const totalBilledAmount = bills.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const totalCollectedAmount = dashboardStats?.billing.total_collected || 0;
+
   return (
     <div className="space-y-6">
       <div>
@@ -151,40 +169,148 @@ export const OverviewTab: React.FC = () => {
       )}
 
       {isAdmin && dashboardStats ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <p className="text-slate-500 text-sm font-medium">Billing collection</p>
-            <p className="text-2xl font-bold text-emerald-600 mt-1">{dashboardStats.billing.collection_rate}%</p>
-            <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-emerald-500 rounded-full"
-                style={{ width: `${Math.min(100, dashboardStats.billing.collection_rate)}%` }}
-              />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <p className="text-slate-500 text-sm font-medium">Billing collection</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">{dashboardStats.billing.collection_rate}%</p>
+              <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full"
+                  style={{ width: `${Math.min(100, dashboardStats.billing.collection_rate)}%` }}
+                />
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                ₹{dashboardStats.billing.total_collected.toLocaleString()} / ₹
+                {dashboardStats.billing.total_amount.toLocaleString()}
+              </p>
             </div>
-            <p className="text-xs text-slate-400 mt-2">
-              ₹{dashboardStats.billing.total_collected.toLocaleString()} / ₹
-              {dashboardStats.billing.total_amount.toLocaleString()}
-            </p>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <p className="text-slate-500 text-sm font-medium">Overdue bills</p>
+              <p className="text-2xl font-bold text-red-600 mt-1">{dashboardStats.billing.overdue_bills}</p>
+              <p className="text-xs text-slate-400 mt-1">{dashboardStats.billing.total_bills} cycles in total</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <p className="text-slate-500 text-sm font-medium">Open helpdesk tickets</p>
+              <p className="text-2xl font-bold text-indigo-600 mt-1">
+                {dashboardStats.complaints.open + dashboardStats.complaints.in_progress}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">{dashboardStats.complaints.resolved} resolved</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <p className="text-slate-500 text-sm font-medium">Occupied flats</p>
+              <p className="text-2xl font-bold text-slate-800 mt-1">{dashboardStats.community.total_residents}</p>
+              <p className="text-xs text-slate-400 mt-1">
+                of {dashboardStats.community.total_flats} units · {dashboardStats.reimbursements.pending} pending
+                reimbursements
+              </p>
+            </div>
           </div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <p className="text-slate-500 text-sm font-medium">Overdue bills</p>
-            <p className="text-2xl font-bold text-red-600 mt-1">{dashboardStats.billing.overdue_bills}</p>
-            <p className="text-xs text-slate-400 mt-1">{dashboardStats.billing.total_bills} cycles in total</p>
-          </div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <p className="text-slate-500 text-sm font-medium">Open helpdesk tickets</p>
-            <p className="text-2xl font-bold text-indigo-600 mt-1">
-              {dashboardStats.complaints.open + dashboardStats.complaints.in_progress}
-            </p>
-            <p className="text-xs text-slate-400 mt-1">{dashboardStats.complaints.resolved} resolved</p>
-          </div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <p className="text-slate-500 text-sm font-medium">Occupied flats</p>
-            <p className="text-2xl font-bold text-slate-800 mt-1">{dashboardStats.community.total_residents}</p>
-            <p className="text-xs text-slate-400 mt-1">
-              of {dashboardStats.community.total_flats} units · {dashboardStats.reimbursements.pending} pending
-              reimbursements
-            </p>
+
+          {/* Desktop Deep-Dive Analysis Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Aging & Collection Sparkline / Breakdown */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                      <TrendingUp size={18} className="text-emerald-600" /> Collection Health &amp; Aging Dues
+                    </h4>
+                    <p className="text-slate-500 text-xs mt-1">Real-time status across society billing cycles</p>
+                  </div>
+                  <Link to="/billing" className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-0.5">
+                    Billing console <ChevronRight size={14} />
+                  </Link>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <div className="flex justify-between text-xs font-semibold text-slate-600">
+                    <span className="text-emerald-700">Collected: ₹{totalCollectedAmount.toLocaleString()}</span>
+                    <span className="text-rose-700">Overdue: ₹{overdueTotalAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="h-3 bg-slate-100 rounded-full overflow-hidden flex">
+                    <div
+                      className="bg-emerald-500 h-full transition-all"
+                      style={{
+                        width: `${totalBilledAmount > 0 ? Math.min(100, (totalCollectedAmount / totalBilledAmount) * 100) : 0}%`,
+                      }}
+                      title="Collected"
+                    />
+                    <div
+                      className="bg-rose-500 h-full transition-all"
+                      style={{
+                        width: `${totalBilledAmount > 0 ? Math.min(100, (overdueTotalAmount / totalBilledAmount) * 100) : 0}%`,
+                      }}
+                      title="Overdue"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100 text-center">
+                  <div className="bg-slate-50 p-2.5 rounded-xl">
+                    <p className="text-[11px] text-slate-500 font-medium">Cycles</p>
+                    <p className="text-base font-bold text-slate-800 mt-0.5">{bills.length}</p>
+                  </div>
+                  <div className="bg-emerald-50 p-2.5 rounded-xl">
+                    <p className="text-[11px] text-emerald-700 font-medium">Collection</p>
+                    <p className="text-base font-bold text-emerald-700 mt-0.5">{dashboardStats.billing.collection_rate}%</p>
+                  </div>
+                  <div className="bg-rose-50 p-2.5 rounded-xl">
+                    <p className="text-[11px] text-rose-700 font-medium">Overdue</p>
+                    <p className="text-base font-bold text-rose-700 mt-0.5">{overdueBills.length} units</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Open Tickets by Category Breakdown */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-base flex items-center gap-2">
+                      <PenTool size={18} className="text-indigo-600" /> Tickets by Category
+                    </h4>
+                    <p className="text-slate-500 text-xs mt-1">
+                      {resolutionRate}% resolved ({totalResolvedComplaints} of {complaints.length} tickets)
+                    </p>
+                  </div>
+                  <Link to="/complaints" className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-0.5">
+                    Helpdesk queue <ChevronRight size={14} />
+                  </Link>
+                </div>
+
+                <div className="mt-4 space-y-2.5">
+                  {Object.keys(openComplaintsByCategory).length === 0 ? (
+                    <div className="text-center py-6 text-slate-400 text-sm flex items-center justify-center gap-2">
+                      <CheckCircle2 size={18} className="text-emerald-500" />
+                      <span>All resident grievances are resolved!</span>
+                    </div>
+                  ) : (
+                    Object.entries(openComplaintsByCategory)
+                      .slice(0, 4)
+                      .map(([category, count]) => {
+                        const pct = totalOpenComplaints > 0 ? Math.round((count / totalOpenComplaints) * 100) : 0;
+                        return (
+                          <div key={category} className="space-y-1">
+                            <div className="flex justify-between text-xs font-semibold">
+                              <span className="capitalize text-slate-700">{category}</span>
+                              <span className="text-slate-500">{count} open ({pct}%)</span>
+                            </div>
+                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className="bg-indigo-600 h-full rounded-full transition-all"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ) : (

@@ -143,7 +143,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         <button
           type="button"
           onClick={onOpenSettings}
-          className="flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-slate-200 min-h-11"
+          className="hidden md:flex items-center gap-2 md:gap-3 pl-2 md:pl-4 border-l border-slate-200 min-h-11"
         >
           {!user ? (
             <div className="flex items-center gap-2">

@@ -49,8 +49,8 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20'}
         `}
       >
-        <div className="p-4 flex items-center gap-3 border-b border-indigo-800 min-h-16">
-          <div className="bg-indigo-600 p-2 rounded-xl text-white">
+        <div className="p-4 flex items-center gap-3 border-b border-white/10 min-h-16">
+          <div className="bg-white/15 p-2 rounded-lg text-white">
             <Building2 size={24} />
           </div>
           {isExpanded && <h1 className="font-bold text-xl tracking-tight">Society Hub</h1>}
@@ -60,7 +60,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           {groups.map((group) => (
             <div key={group.id}>
               {isExpanded && (
-                <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300/80">
+                <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-200/70">
                   {group.label}
                 </p>
               )}
@@ -75,16 +75,16 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                       type="button"
                       title={label}
                       onClick={() => handleNavClick(item.path)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 min-h-11 rounded-xl transition-colors relative ${
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 min-h-11 rounded-lg transition-colors relative ${
                         activeTab === item.id
-                          ? 'bg-indigo-800 text-white'
-                          : 'text-indigo-200 hover:bg-indigo-800/60 hover:text-white'
+                          ? 'bg-white/15 text-white font-medium shadow-xs'
+                          : 'text-indigo-100/80 hover:bg-white/10 hover:text-white'
                       }`}
                     >
                       <div className="relative shrink-0">
                         <item.icon size={20} />
                         {badgeCount > 0 && !isExpanded && (
-                          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-indigo-900">
+                          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-[#22265E]">
                             {badgeCount > 9 ? '9+' : badgeCount}
                           </span>
                         )}
@@ -107,12 +107,12 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           ))}
         </nav>
 
-        <div className="p-4 border-t border-indigo-800 space-y-1">
+        <div className="p-4 border-t border-white/10 space-y-1">
           <button
             type="button"
             title="Settings"
             onClick={() => handleNavClick('/settings')}
-            className="w-full flex items-center gap-3 px-3 py-2.5 min-h-11 text-indigo-200 hover:text-white transition-colors rounded-xl"
+            className="w-full flex items-center gap-3 px-3 py-2.5 min-h-11 text-indigo-100/80 hover:bg-white/10 hover:text-white transition-colors rounded-lg"
           >
             <Settings size={20} className="shrink-0" />
             {isExpanded && <span className="text-sm">Settings</span>}
@@ -121,7 +121,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             type="button"
             title="Logout"
             onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 min-h-11 text-indigo-200 hover:text-white transition-colors rounded-xl"
+            className="w-full flex items-center gap-3 px-3 py-2.5 min-h-11 text-indigo-100/80 hover:bg-white/10 hover:text-white transition-colors rounded-lg"
           >
             <LogOut size={20} className="shrink-0" />
             {isExpanded && <span className="text-sm">Logout</span>}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store';
-import { DashboardSkeleton } from '../../components/skeleton';
+import { DashboardSkeleton, AuthSkeleton } from '../../components/skeleton';
 import LandingPage from '../landing/LandingPage';
 import Dashboard from '../dashboard/Dashboard';
 
@@ -10,7 +10,13 @@ export const RootGate: React.FC = () => {
   const location = useLocation();
 
   if (isLoading) {
-    return <DashboardSkeleton />;
+    if (isAuthenticated || user) {
+      return <DashboardSkeleton />;
+    }
+    if (location.pathname === '/') {
+      return <LandingPage />;
+    }
+    return <AuthSkeleton />;
   }
 
   if (!isAuthenticated || !user) {

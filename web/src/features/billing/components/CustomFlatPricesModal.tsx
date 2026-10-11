@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, X, Tag } from 'lucide-react';
+import ModalShell from '../../../components/ui/ModalShell';
 import type { Bill, FlatAmountOverride, FlatAmountOverrideOut, Flat } from '../../../types';
 import { useFlatsQuery } from '../../../hooks/queries/useFlats';
 import {
@@ -69,7 +70,7 @@ export const CustomFlatPricesModal: React.FC<CustomFlatPricesModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay">
+    <ModalShell isOpen={Boolean(bill)} onClose={onClose}>
       <form
         onSubmit={handleSave}
         className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-lg space-y-4 relative overflow-hidden flex flex-col max-h-[85vh]"
@@ -198,7 +199,7 @@ export const CustomFlatPricesModal: React.FC<CustomFlatPricesModalProps> = ({
           </button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 };
 

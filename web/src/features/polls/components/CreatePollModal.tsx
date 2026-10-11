@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import SuccessTickOverlay from '../../../components/SuccessTickOverlay';
+import ModalShell from '../../../components/ui/ModalShell';
 
 interface CreatePollModalProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export const CreatePollModal: React.FC<CreatePollModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay">
+    <ModalShell isOpen={isOpen} onClose={onClose}>
       <form onSubmit={onSubmit} className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto relative">
         <SuccessTickOverlay show={isSuccess} message="Survey Poll Launched!" />
 
@@ -132,7 +133,7 @@ export const CreatePollModal: React.FC<CreatePollModalProps> = ({
           </button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 };
 

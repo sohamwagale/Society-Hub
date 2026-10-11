@@ -1,4 +1,5 @@
 import React from 'react';
+import ModalShell from '../../../components/ui/ModalShell';
 
 interface UploadReceiptModalProps {
   isOpen: boolean;
@@ -13,10 +14,8 @@ export const UploadReceiptModal: React.FC<UploadReceiptModalProps> = ({
   onSubmit,
   setBillReceiptFile
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="modal-overlay">
+    <ModalShell isOpen={isOpen} onClose={onClose}>
       <form onSubmit={onSubmit} className="modal-panel bg-white border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4">
         <h3 className="font-bold text-slate-800 text-lg">Upload manual Receipt / Proof</h3>
         <p className="text-xs text-slate-500">
@@ -32,15 +31,15 @@ export const UploadReceiptModal: React.FC<UploadReceiptModalProps> = ({
           />
         </div>
         <div className="flex gap-3 pt-2">
-          <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-xs">
+          <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm min-h-11">
             Submit Receipt
           </button>
-          <button type="button" onClick={onClose} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 rounded-lg text-xs">
+          <button type="button" onClick={onClose} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm min-h-11">
             Cancel
           </button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 };
 

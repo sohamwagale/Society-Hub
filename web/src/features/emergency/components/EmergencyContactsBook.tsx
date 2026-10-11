@@ -1,7 +1,8 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, PhoneCall } from 'lucide-react';
 import type { EmergencyContact, User } from '../../../types';
 import { EmergencyContactCard } from './EmergencyContactCard';
+import EmptyState from '../../../components/ui/EmptyState';
 
 interface EmergencyContactsBookProps {
   emergencyContacts: EmergencyContact[];
@@ -39,7 +40,24 @@ export const EmergencyContactsBook: React.FC<EmergencyContactsBookProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {emergencyContacts.length === 0 ? (
-          <p className="col-span-full text-slate-400 text-sm text-center py-12">No emergency entries.</p>
+          <div className="col-span-full">
+            <EmptyState
+              icon={PhoneCall}
+              title="No emergency contacts configured"
+              description="Add essential numbers like security gate, secretary, lift technician, and plumber for quick community dialling."
+              action={
+                user?.role === 'admin' ? (
+                  <button
+                    type="button"
+                    onClick={onOpenAddModal}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-4 py-2.5 rounded-xl min-h-11 shadow-sm"
+                  >
+                    Add first contact
+                  </button>
+                ) : undefined
+              }
+            />
+          </div>
         ) : (
           emergencyContacts.map((c) => (
             <EmergencyContactCard

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Paperclip, CheckCircle, XCircle } from 'lucide-react';
+import ModalShell from '../../../components/ui/ModalShell';
 import type { ReimbursementRequest } from '../../../types';
 import { reimbursementsAPI } from '../../../services/api';
 
@@ -81,7 +82,7 @@ export const ReimbursementDetailsModal: React.FC<ReimbursementDetailsModalProps>
   };
 
   return (
-    <div className="modal-overlay">
+    <ModalShell isOpen={isOpen} onClose={onClose}>
       <div className="modal-panel bg-white border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex justify-between items-start p-5 border-b border-slate-100 bg-slate-50/50">
@@ -270,7 +271,7 @@ export const ReimbursementDetailsModal: React.FC<ReimbursementDetailsModalProps>
           )}
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 };
 

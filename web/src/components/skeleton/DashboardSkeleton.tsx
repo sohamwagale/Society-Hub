@@ -9,7 +9,7 @@ export const DashboardSkeleton: React.FC<DashboardSkeletonProps> = ({ children }
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
       {/* Mock Sidebar Skeleton */}
-      <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 hidden md:flex">
+      <aside className="w-64 bg-indigo-900 border-r border-slate-800 flex flex-col justify-between shrink-0 hidden md:flex">
         <div className="p-5 space-y-6">
           {/* Brand header */}
           <div className="flex items-center gap-3">

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../store';
-import { DashboardSkeleton } from '../../components/skeleton';
+import { AuthSkeleton } from '../../components/skeleton';
 
 interface GuestRouteProps {
   children: React.ReactNode;
@@ -11,7 +11,7 @@ export const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
   const { user, isAuthenticated, isLoading } = useAuthStore();
 
   if (isLoading) {
-    return <DashboardSkeleton />;
+    return <AuthSkeleton />;
   }
 
   if (isAuthenticated && user) {

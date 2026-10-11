@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store';
 
-import { DashboardSkeleton } from '../../components/skeleton';
+import { DashboardSkeleton, AuthSkeleton } from '../../components/skeleton';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,7 +14,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
   const location = useLocation();
 
   if (isLoading) {
-    return <DashboardSkeleton />;
+    if (isAuthenticated || user) {
+      return <DashboardSkeleton />;
+    }
+    return <AuthSkeleton />;
   }
 
   if (!isAuthenticated || !user) {

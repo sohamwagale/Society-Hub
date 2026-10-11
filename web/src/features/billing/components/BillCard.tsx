@@ -79,34 +79,34 @@ export const BillCard: React.FC<BillCardProps> = ({
           ) : (
             <>
               {bill.payment_status !== 'paid' && (
-                <>
+                <div className="flex flex-wrap w-full sm:w-auto gap-2">
                   <button
                     onClick={() => onRazorpayCheckout(bill)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-1.5 rounded"
+                    className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl min-h-11 shadow-sm flex items-center justify-center transition-colors"
                   >
                     Pay Online
                   </button>
                   <button
                     onClick={() => onOpenReceiptUpload(bill.id)}
-                    className="border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded"
+                    className="flex-1 sm:flex-none border border-slate-300 hover:bg-slate-100 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-xl min-h-11 flex items-center justify-center transition-colors"
                   >
                     Upload Receipt
                   </button>
-                </>
+                </div>
               )}
               {bill.payment_status === 'paid' && paymentMatch && (
-                <div className="flex gap-2 items-center">
+                <div className="flex flex-wrap w-full sm:w-auto gap-2 items-center">
                   <a
                     href={billsAPI.getReceiptUrl(paymentMatch.id)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1"
+                    className="flex-1 sm:flex-none bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-bold px-4 py-2.5 rounded-xl min-h-11 flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    <Download size={12} /> Receipt (PDF)
+                    <Download size={14} /> Receipt (PDF)
                   </a>
                   <button
                     onClick={() => onOpenReceiptUpload(bill.id)}
-                    className="border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded"
+                    className="flex-1 sm:flex-none border border-slate-300 hover:bg-slate-100 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-xl min-h-11 flex items-center justify-center transition-colors"
                   >
                     Upload Screenshot
                   </button>
